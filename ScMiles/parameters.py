@@ -11,7 +11,7 @@ A class that stores all of the information from input
 
 class parameters:
     def __init__(self, MS_list=None, Finished=None, MS_new=None, 
-                 ignorNewMS=None, coor=None, NVT=None
+                 ignorNewMS=None, coor=None, NVT=None,
                  nodes=None, timeFactor=None, current_iteration_time=None,
                  sampling_interval=None,
                  maxIteration=None, network=None,
@@ -194,7 +194,7 @@ class parameters:
                     self.outputname = info[1]
                 if "NVT" in line:
                     if str(info[1]).lower() == 'true' or 'yes' or 'on':
-                    self.NVT = True
+                        self.NVT = True
 
                 if "time_step" in line:
                     self.timeFactor = float(info[1])    
