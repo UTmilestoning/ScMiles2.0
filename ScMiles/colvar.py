@@ -31,9 +31,6 @@ class colvar:
         self.var2 = var2
         self.free = free
         self.initial = initial
-        self.path = os.path.dirname(os.path.abspath(__file__))
-        self.parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.input_dir = self.parent_path + '/my_project_input'
         self.config_path = self.path + "/colvar_free.conf" if self.free == 'yes' else self.path + "/colvar.conf"
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -73,7 +70,7 @@ class colvar:
     def __get_colvar_names(self):
         count = 0
         section = 1
-        with open(file=self.input_dir + '/colvar.txt') as f:
+        with open(file=self.parameter.inputPath + '/colvar.txt') as f:
             for line in f:
                 if '{' in line:
                     count += 1
@@ -99,7 +96,7 @@ class colvar:
     def __collective_vari_1(self, name=None, coeff=None, space=0):
         tmp = []
         count = 0
-        with open(file=self.input_dir+'/colvar.txt') as f:
+        with open(file=self.parameter.inputPath + '/colvar.txt') as f:
             for line in f:
                 if '{' in line:
                     count += 1
@@ -125,7 +122,7 @@ class colvar:
         tmp = []
         count = 0
         section = 1
-        with open(file=self.input_dir+'/colvar.txt') as f:
+        with open(file=self.parameter.inputPath + '/colvar.txt') as f:
             for line in f:
                 if '{' in line:
                     count += 1
@@ -157,7 +154,7 @@ class colvar:
         first = True
         section = 1
         name_get = False
-        with open(file=self.input_dir+'/colvar.txt') as f:
+        with open(file=self.parameter.inputPath + '/colvar.txt') as f:
             for line in f:
                 if '{' in line:
                     first = False
@@ -219,7 +216,7 @@ class colvar:
 
     def generate(self):    
         # scriptPath = os.path.dirname(os.path.abspath(__file__))
-        config_path = self.path + "/colvar_free.conf" if self.free == 'yes' else self.path + "/colvar.conf"
+        config_path = self.ScMilesPath + "/colvar_free.conf" if self.free == 'yes' else self.ScMilesPath + "/colvar.conf"
         
         colvarsTrajFrequency = self.parameter.colvarsTrajFrequency
         colvarsRestartFrequency = self.parameter.colvarsRestartFrequency
@@ -264,7 +261,7 @@ class colvar:
     def __append_customColvars(self):
         # scriptPath = os.path.dirname(os.path.abspath(__file__))
         # inputdir = os.path.abspath(os.path.join(scriptPath, os.pardir)) + '/my_project_input'
-        custom_file = self.input_dir + '/custom.colvar'
+        custom_file = self.parameter.inputPath + '/custom.colvar'
         fconf = open(self.config_path, 'a')
         print("", file=fconf)
         with open(file=custom_file) as f_custom:
