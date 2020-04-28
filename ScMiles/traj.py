@@ -154,8 +154,6 @@ class traj:
         scriptPath = os.path.dirname(os.path.abspath(__file__)) 
         struPath = os.path.join(scriptPath, os.pardir) + '/crd/' + name + '/' + str(self.parameter.iteration)
         next_frame = 1
-        if self.parameter.method == 0:
-            return next_frame
         while True:
             Path = struPath + '/' + str(next_frame) 
             if os.path.exists(Path):
