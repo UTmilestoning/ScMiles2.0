@@ -149,20 +149,27 @@ class parameters:
         
         self.flux = []      #flux
         
+        import os
+        
+        self.ScMilesPath = os.path.dirname(os.path.abspath(__file__))
+        self.parentDirectory = os.path.abspath(os.path.join(self.ScMilesPath, os.pardir))
+        self.crdPath = self.parentDirectory + '/crd'
+        self.inputPath = self.parentDirectory + 'my_project_input'
+        self.outputPath = self.parentDirectory + 'my_project_output'
+        self.AnchorPath = 'self.inputPath + '/anchors.txt'
+        
         self.__read_input()
         
-        import os
-        scriptPath = os.path.dirname(os.path.abspath(__file__)) 
-        nodeFile = scriptPath + '/nodelist'
-        if os.path.isfile(nodeFile):
-            self.__read_nodelist(nodeFile)
+        if os.path.isfile(self.ScMilesPath + '/nodelist'):
+            with open(file = self.ScMilesPath + '/nodelist'):
+                for line in f:
+                    if '#' in line:
+                        continue
+                    line = line.split('\n')
+                    self.nodes.append(str(line[0]))
     
     def __read_input(self):
-        import os
-        scriptPath = os.path.dirname(os.path.abspath(__file__)) 
-        inputfolder = os.path.abspath(os.path.join(scriptPath, os.pardir)) + '/my_project_input'
-        inputFile = inputfolder + '/input.txt'
-        with open(file=inputFile) as f:
+        with open(file=self.inputPath + '/input.txt') as f:
             for line in f:
                 line = line.rstrip()
                 info = line.split(" ")
@@ -275,33 +282,19 @@ class parameters:
         for i in range(self.colvarsNum + self.AnchorNum):
             self.trajWidths.append(23)
 
-    def __read_nodelist(self, nodelist):
-        with open(file=nodelist) as f:
-            for line in f:
-                if "#" in line:
-                    continue
-                line = line.split("\n")
-                self.nodes.append(str(line[0]))
-
     def initialize(self):
         import pandas as pd
         import os
         import re
-        scriptPath = os.path.dirname(os.path.abspath(__file__)) 
-        inputfolder = os.path.abspath(os.path.join(scriptPath, os.pardir)) + '/my_project_input'
-        outputfolder = os.path.abspath(os.path.join(scriptPath, os.pardir)) + '/my_project_output'
-        self.anchors = pd.read_fwf(inputfolder+'/anchors.txt', header=None).values
-        self.AnchorPath = inputfolder+'/anchors.txt'
-        crdfolder = os.path.abspath(os.path.join(scriptPath, os.pardir)) + '/crd'
-        if not os.path.exists(crdfolder):
-            os.makedirs(crdfolder)
-        if not os.path.exists(outputfolder):
-            os.makedirs(outputfolder) 
-        currentfolder = outputfolder + '/current'
-        if not os.path.exists(currentfolder):
-            os.makedirs(currentfolder)     
+        self.anchors = pd.read_fwf(self.AnchorPath, header=None).values
+        if not os.path.exists(self.crdPath):
+            os.makedirs(self.crdPath)
+        if not os.path.exists(self.outputPath):
+            os.makedirs(self.outputPath) 
+        if not os.path.exists(self.outputPath + '/current'):
+            os.makedirs(self.outputPath + '/current')     
         # read initial run time for seek and time step setup
-        with open(inputfolder + '/free.namd', 'r') as f:   
+        with open(self.inputPath + '/free.namd', 'r') as f:   
             for line in f:
                 info = line.split("#")[0].split()
                 # info = line.split()
@@ -317,7 +310,7 @@ class parameters:
                         continue
         # read restart frequency to get the name of restart files
         # such restart files will be used as the initial position for free traj
-        with open(inputfolder + '/sample.namd', 'r') as f:
+        with open(self.inputPath + '/sample.namd', 'r') as f:
             for line in f:
                 info = line.split("#")[0].split()
                 if len(info) < 1:
@@ -326,9 +319,8 @@ class parameters:
                     self.sampling_interval = int(re.findall(r"[-+]?\d*\.\d+|\d+", info[1])[0])
         # initial log file
         from log import log
-        logname = currentfolder + '/log'
-        if os.path.exists(logname):
-            os.remove(logname)            
+        if os.path.exists(self.outputPath = '/current/log'):
+            os.remove(self.outputPath = '/current/log')            
         log("Initialized with {} anchors.".format(self.AnchorNum))
 #        print(self.namd_conf ) 
 
