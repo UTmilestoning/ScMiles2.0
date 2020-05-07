@@ -30,7 +30,7 @@ class colvar:
         self.anchor2 = anchor2
         self.variables = []
         self.free = free
-        print(self.colvars_number)
+        self.colvars_number = len(self.parameter.anchors[0])
         for i in range(1, self.colvars_number + 1):
             self.variables.append("")
         self.initial = initial
