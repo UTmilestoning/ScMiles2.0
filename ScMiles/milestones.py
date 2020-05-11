@@ -192,7 +192,7 @@ class milestones:
                          ms_path + '/seek.ms.pdb')
                     if self.parameter.namd_conf == True:
                         copy(path + '/' + self.parameter.outputname + '.restart.xsc', 
-                            ms_path + '/read.xsc')
+                            ms_path + '/sample.xsc')
                     milestones.add(name)
 
         log("{} milestomes have been identified.".format(len(milestones)))  
