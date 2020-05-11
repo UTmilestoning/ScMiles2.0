@@ -13,8 +13,11 @@ __all__ = ['namd_conf_mod']
 
 from fileinput import FileInput
 
-def namd_conf_mod(inputdir, newNamd, anchor):
-    vector, origin = namd_conf_read(inputdir, anchor)
+def namd_conf_mod(inputdir, newNamd, milestone_search, anchor=None):
+    if milestone_search == 0:
+        vector, origin = namd_conf_read(inputdir, anchor)
+    else:
+        vector, origin = read_xsc(inputdir)
     with FileInput(files=newNamd, inplace=True) as f:
         for line in f:
             line = line.strip()
@@ -50,6 +53,16 @@ def namd_conf_read(inputdir,anchor):
 #    print(vector, origin, anchor)
     return vector, origin
 
+def read_xsc(pathname):
+    with open(pathname + '/read.xsc') as r:
+        for line in r:
+            line = line.strip()
+            info = line.split()
+            if line.startswith('#'):
+                continue
+            vector = [float(info[1]), float(info[5]), float(info[9])]
+            origin = [x / 2.0 for x in vector]
+        return vector, origin    
 
 if __name__ == '__main__':
     namd_conf_mod('.', 'sample.namd', 1)
