@@ -13,7 +13,7 @@ __all__ = ['namd_conf_mod']
 
 from fileinput import FileInput
 
-def namd_conf_mod(inputdir, newNamd, milestone_search, anchor=None):
+def namd_conf_mod(inputdir, newNamd, anchor):
     vector, origin = namd_conf_read(inputdir, anchor)
     with FileInput(files=newNamd, inplace=True) as f:
         for line in f:
