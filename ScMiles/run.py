@@ -288,7 +288,7 @@ class run:
                 f.write(tmp[i])
                 
         if self.parameter.namd_conf == True:
-            if not snapshot and (initial or milestone_search == 0):
+            if not snapshot and (initial or self.parameter.milestone_search == 0):
                 namd_conf_mod(pardir + '/my_project_input', newNamd, a1)
         
         with FileInput(files=newNamd, inplace=True) as f:
