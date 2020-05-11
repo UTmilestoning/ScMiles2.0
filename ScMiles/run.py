@@ -286,7 +286,13 @@ class run:
         with open(newNamd, 'w') as f:
             for i in range(len(tmp)):
                 f.write(tmp[i])
-                    
+                
+        if self.parameter.namd_conf == True and not snapshot:
+            if self.parameter.milestone_search == 0 or initial: 
+                namd_conf_mod(pardir + '/my_project_input', newNamd, milestone_search=0, anchor=a1)
+            else: 
+                namd_conf_mod(MSpath, newNamd, milestone_search=1)
+        
         with FileInput(files=newNamd, inplace=True) as f:
             for line in f:
                 line = line.strip()
