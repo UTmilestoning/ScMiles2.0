@@ -287,11 +287,9 @@ class run:
             for i in range(len(tmp)):
                 f.write(tmp[i])
                 
-        if self.parameter.namd_conf == True and not snapshot:
-            if self.parameter.milestone_search == 0 or initial: 
-                namd_conf_mod(pardir + '/my_project_input', newNamd, milestone_search=0, anchor=a1)
-            else: 
-                namd_conf_mod(MSpath, newNamd, milestone_search=1)
+        if self.parameter.namd_conf == True:
+            if not snapshot and (initial or milestone_search == 0):
+                namd_conf_mod(pardir + '/my_project_input', newNamd, a1)
         
         with FileInput(files=newNamd, inplace=True) as f:
             for line in f:
@@ -342,6 +340,9 @@ class run:
                                       str(frame * self.parameter.sampling_interval) + '.xsc'
                         else:
                             info[1] = self.parameter.outputname + '.xsc'
+                    elif self.parameter.namd_conf == True and not initial and self.parameter.milestone_search == 1:
+                        info[0] = 'extendedSystem'
+                        info[1] = './seek.xsc'
                                 
                 if "restartsave" in line:
                     if snapshot is not None or initial == 'yes':
