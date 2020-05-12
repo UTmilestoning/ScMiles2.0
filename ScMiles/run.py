@@ -33,32 +33,22 @@ class run:
 
     def submit(self, a1=None, a2=None, snapshot=None, frame=None, initial=None, initialNum=None):
         '''job submission'''
-        scriptPath = os.path.dirname(os.path.abspath(__file__)) 
-        inputdir = os.path.abspath(os.path.join(scriptPath, os.pardir)) + '/my_project_input'
-        templateScript = inputdir + "/submit"
-        newScript = self.__prepare_script(templateScript, a1, a2, snapshot, initial, initialNum)
-        templatepath = inputdir 
-        self.__prepare_namd(templatepath, a1, a2, snapshot,frame, initial, initialNum)
+        newScript = self.__prepare_script(a1, a2, snapshot, initial, initialNum)
+        self.__prepare_namd(a1, a2, snapshot,frame, initial, initialNum)
         
         lst = sorted([a1, a2])
-        name = str(lst[0]) + '_' + str(lst[1])
-        MSpath = os.path.join(scriptPath, os.pardir) +  '/crd/' + name 
-    #    if not os.path.exists(MSpath):
-    #        os.makedirs(MSpath)
+        MSpath = self.parameter.crdPath + '/' + str(lst[0]) + '_' + str(lst[1])
         
         if snapshot is not None:
-            folderPath = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot)
-    #        if parameter.iteration >= 1:
-    #            get_initial_ms(parameter, folderPath)
-            origColvar = scriptPath + "/colvar_free.conf"
-            destColvar = folderPath + "/colvar_free.conf"
+            origColvar = self.parameter.ScMilesPath + "/colvar_free.conf"
+            destColvar = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot) + "/colvar_free.conf"
         elif initial is not None:
-            pardir = os.path.abspath(os.path.join(scriptPath, os.pardir)) + '/crd/seek'
-            origColvar = scriptPath + "/colvar_free.conf"
-            destColvar = pardir + "/structure" + str(a1) + "/" + str(initialNum) + "/colvar_free.conf"
+            origColvar = self.parameter.ScMilesPath + "/colvar_free.conf"
+            destColvar = self.parameter.seekPath + "/structure" + str(a1) + "/" + str(initialNum) + "/colvar_free.conf"
         else:
-            origColvar = scriptPath + "/colvar.conf"
+            origColvar = self.parameter.ScMilesPath + "/colvar.conf"
             destColvar = MSpath + "/colvar.conf"
+        
         copy(origColvar, destColvar)    
              
         while True:
@@ -91,30 +81,26 @@ class run:
                 return False
         return True # finished
     
-    def __prepare_script(self, template, a1, a2, snapshot=None, initial=None, initialNum=None):
+    def __prepare_script(self, a1, a2, snapshot=None, initial=None, initialNum=None):
         '''mordify job submission file'''
         from fileinput import FileInput
         import os
-        filePath = os.path.dirname(os.path.abspath(__file__)) 
-        pardir = os.path.abspath(os.path.join(filePath, os.pardir))
-        seekpath = pardir + '/crd/seek'
+
         lst = sorted([a1, a2])
         name = str(lst[0]) + '_' + str(lst[1])
-        MSpath = pardir + '/crd/' + name 
+        MSpath = self.parameter.crdPath + '/' + name 
     
         if snapshot is not None:
             newScriptPath = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot)
             newScript = newScriptPath + "/submit"
         elif initial is not None:
-            newScriptPath = seekpath + '/structure' + str(a1) + "/" + str(initialNum)
+            newScriptPath = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum)
             newScript = newScriptPath + '/submit'
         else:
             newScriptPath = MSpath
             newScript = newScriptPath + "/MS" + name
-        if not os.path.exists(newScriptPath):
-            os.makedirs(newScriptPath)
-    
-        copyfile(template, newScript)
+        create_folder(newScriptPath)
+        copyfile(self.parameter.inputPath + '/submit', newScript)
 
         with FileInput(files=newScript, inplace=True) as f:
             for line in f:
@@ -162,43 +148,35 @@ class run:
                 print(line)
         return newScript     
 
-    def __prepare_namd(self, template, a1=None, a2=None, snapshot=None,frame=None, initial=None, initialNum=None):
+    def __prepare_namd(self, a1=None, a2=None, snapshot=None,frame=None, initial=None, initialNum=None):
         '''modify namd configuration file'''
         from fileinput import FileInput
         from random import randrange as rand 
         import re
         
-        inputdir = template
-        
-        if snapshot is not None:
-            template = template + "/free.namd"   
-        elif initial is not None:
-            template = template + "/free.namd"  
-        else:
-            template = template + "/sample.namd" 
-        
-        filePath = os.path.dirname(os.path.abspath(__file__)) 
-        pardir = os.path.abspath(os.path.join(filePath, os.pardir))
-     
+        enhanced = 0
         lst = sorted([a1, a2])
         name = str(lst[0]) + '_' + str(lst[1])
-        MSpath = pardir + '/crd/' + name if initial is None else pardir + '/crd/seek/structure' + str(a1)
-    
-        if snapshot is not None:
-            filename = "/" + str(self.parameter.iteration) + "/" + str(snapshot) + "/free.namd"    ######### miles
-        elif initial is not None:
+        
+        if initial:
+            template = self.parameter.inputPath+ "/free.namd" 
+            MSpath = self.parameter.seekPath + '/structure' + str(a1)
             filename = "/" + str(initialNum) + "/free.namd"
+        elif snapshot:
+            template = self.parameter.inputPath+ "/free.namd" 
+            MSpath = self.parameter.crdPath + '/' + name
+            filename = "/" + str(self.parameter.iteration) + "/" + str(snapshot) + "/free.namd"
+            if os.path.isfile(MSpath + "/" + str(self.parameter.iteration) + "/" + str(snapshot) + '/enhanced'):
+                enhanced== 1
+            else:
+                enhanced =0
         else:
-            filename = "/sample.namd" 
+            template = self.parameter.inputPath + "/sample.namd"
+            MSpath = self.parameter.crdPath + '/' + name
+            filename = "/sample.namd"
         
         newNamd = MSpath + filename
         copyfile(template, newNamd)
-        
-        if snapshot is not None and os.path.isfile(MSpath + "/" + str(self.parameter.iteration) + "/" +
-                                                   str(snapshot) + '/enhanced'):
-            enhanced = 1
-        else:
-            enhanced = 0
             
         tmp = []
         colvar_commands = False
@@ -234,7 +212,7 @@ class run:
                         tmp.append(l)
                         colvar_commands = True
                     if initial is not None:
-                        with open(file=filePath+'/tclScript_seek.txt') as f_tcl:
+                        with open(file=self.parameter.ScMilesPath+'/tclScript_seek.txt') as f_tcl:
                             for l in f_tcl:
                                 if "qsub" in l:
                                     kill = l.strip()
@@ -258,7 +236,7 @@ class run:
                                     tmp.append(l)
                         tmp.append('\n')
                     if snapshot is not None:
-                        with open(file=filePath+'/tclScript_step2.txt') as f_tcl:
+                        with open(file=self.parameter.ScMilesPath+'/tclScript_step2.txt') as f_tcl:
                             for l in f_tcl:
                                 if "qsub" in l:
                                     kill = l.strip()
@@ -289,16 +267,16 @@ class run:
                 
         if self.parameter.namd_conf == True:
             if not snapshot and (initial or self.parameter.milestone_search == 0):
-                namd_conf_mod(pardir + '/my_project_input', newNamd, a1)
-        
+                namd_conf_mod(self.parameter.inputPath, newNamd, a1)
+            
         with FileInput(files=newNamd, inplace=True) as f:
             for line in f:
                 line = line.strip()
 #                line = line.lower()
                 info = line.split()
                 
-                if "coordinates" in line:
-                    info[1] = pardir + '/my_project_input/pdb/' + str(lst[0]) + ".pdb"
+                if "coordinates" in line and 'bincoordinates' not in line.lower():
+                    info[1] = self.parameter.inputPath + '/pdb/' + str(lst[0]) + ".pdb"
                     if snapshot is None and initial is None and self.parameter.milestone_search == 1:
                         info[1] = "./seek.ms.pdb" 
                         
@@ -340,9 +318,10 @@ class run:
                                       str(frame * self.parameter.sampling_interval) + '.xsc'
                         else:
                             info[1] = self.parameter.outputname + '.xsc'
-                    elif self.parameter.namd_conf == True and not initial and self.parameter.milestone_search == 1:
+                    if self.parameter.namd_conf == True and not initial and self.parameter.milestone_search == 1:
                         info[0] = 'extendedSystem'
                         info[1] = './seek.xsc'
+                        
                                 
                 if "restartsave" in line:
                     if snapshot is not None or initial == 'yes':
@@ -403,6 +382,7 @@ class run:
                 line = " ".join(str(x) for x in info)
                 print(line)
         
+        
 #        print(filename, self.parameter.namd_conf)
 #        if filename == "/sample.namd" and self.parameter.namd_conf == True:
 #            namd_conf_mod(inputdir, newNamd, a1)
@@ -419,8 +399,13 @@ def get_initial_ms(path):
 
 
 if __name__ == '__main__':
+    from parameters import *
+    from namd_conf_custom import *
+    
     new = parameters()
+    new.initialize()
     jobs = run(new)
-    jobs._run__prepare_namd('./test.namd', a1=1, a2=2)
+    new.iteration = 2
+    jobs._run__prepare_namd(a1=2, a2=3, initial='yes', initialNum = 1)
 
     
