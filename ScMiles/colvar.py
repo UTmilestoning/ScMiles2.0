@@ -199,7 +199,7 @@ class colvar:
         print("colvarsRestartFrequency	 {}".format(self.parameter.colvarsRestartFrequency), file=fconf)
         if self.free == 'yes':
             print("scriptedColvarForces on", file=fconf)
-        if self.parameter.customColvars == 1:
+        if self.parameter.customColvars == True:
             print("", file=fconf)
             with open(file=self.input_dir + '/custom.colvar') as f_custom:
                 for line in f_custom:
