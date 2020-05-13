@@ -285,7 +285,9 @@ class run:
                     
                 if "seed" in line:
                     info[1] = rand(10000000, 99999999)
-            
+                if 'restartfreq' in line:
+                    if initial:
+                        info[1] = 2
                 if "bincoordinates" in line or "binCoordinates" in line:
                     if snapshot is not None:
                         info[0] = 'bincoordinates'
