@@ -148,9 +148,9 @@ class parameters:
                     continue
                 for item in parameter_list:
                     if item[0] in info:
-                        if item[2] == 'integer_num':
+                        if item[2] == 'integer':
                             setattr(self, item[1], int(info[1]))
-                        elif item[2] == 'float_num':
+                        elif item[2] == 'float':
                             setattr(self, item[1], float(info[1]))
                         elif item[2] == 'yes_or_no':
                             if str(info[1]).lower() in ('true','yes','on','1'):
