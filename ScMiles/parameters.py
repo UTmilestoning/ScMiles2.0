@@ -27,7 +27,7 @@ class parameters:
                  outputname=None, namd_conf=None, AnchorPath=None, AnchorNum=None,  
                  new_anchor=None, anchor_dist=None, jobsubmit=None, jobcheck=None,
                  anchors=None, atomNumbers=None, error=None, MFPT=None, kij=None, 
-                 index=None, flux=None, sing=None, MS_dictionary=None) -> None:
+                 index=None, flux=None, sing=None, seek_restartfreq=None) -> None:
 
         self.iteration = 0    # current iteration number
         self.method = 0       # 0 for classic milestoning; 1 for exact milestoning: iteration
@@ -85,8 +85,8 @@ class parameters:
         self.kij = []       #kij matrix
         self.index = []     # milestone index
         self.flux = []      #flux
+        self.seek_restartfreq = 1000
         self.anchors = anchors
-        self.MS_dictionary = MS_dictionary
         self.ScMilesPath = os.path.dirname(os.path.abspath(__file__))
         self.parentDirectory = os.path.abspath(os.path.join(self.ScMilesPath, os.pardir))
         self.crdPath = os.path.join(self.parentDirectory, 'crd')
@@ -104,40 +104,41 @@ class parameters:
         import re
         from log import log
 
-        parameter_list= (('method', 'method', 'integer_num'), 
+        parameter_list= (('method', 'method', 'integer'), 
                         ('inital_iteration', 'iteration','minus_one'),
-                        ('max_iteration', 'maxIteration', 'integer_num'),
-                        ('milestoneSearch','milestone_search', 'integer_num'),
+                        ('max_iteration', 'maxIteration', 'integer'),
+                        ('milestoneSearch','milestone_search', 'integer'),
                         ('pbc', 'pbc', 'replace_comma'),
                         ('structure', 'structure', 'no_type'),
                         ('coordinates', 'coordinates', 'no_type'),
                         ('outputname', 'outputname', 'no_type'),
                         ('NVT', 'NVT', 'yes_or_no'),
-                        ('time_step','timeFactor','float_num'),
-                        ('initial_traj','initial_traj','integer_num'),
-                        ('initial_time', 'initialTime', 'integer_num'),
+                        ('time_step','timeFactor','float'),
+                        ('initial_traj','initial_traj','integer'),
+                        ('initial_time', 'initialTime', 'integer'),
                         ('ignore_new_ms','ignorNewMS', 'yes_or_no'),
                         ('colvarType', 'colvarType', 'no_type'),
-                        ('custom_colvar', 'colvarsNum', 'integer_num'),
+                        ('custom_colvar', 'colvarsNum', 'integer'),
                         ('colvarsTrajFrequency', 'colvarsTrajFrequency', 'no_type'),
                         ('colvarsRestartFrequency', 'colvarsRestartFrequency', 'no_type'),
                         ('customColvars','customColvars', 'yes_or_no'),
-                        ('force_const', 'forceConst', 'integer_num'),
-                        ('anchorsNum', 'AnchorNum', 'integer_num'),
+                        ('force_const', 'forceConst', 'integer'),
+                        ('anchorsNum', 'AnchorNum', 'integer'),
                         ('find_new_anchor','new_anchor', 'yes_or_no'),
-                        ('new_anchor_dist', 'anchor_dist', 'float_num'),
+                        ('new_anchor_dist', 'anchor_dist', 'float'),
                         ('reactant', 'reactant', 'replace_comma'),
                         ('product', 'product', 'replace_comma'),
-                        ('total_trajs', 'nframe', 'integer_num'),
-                        ('start_traj', 'startTraj', 'integer_num'),
-                        ('traj_per_launch', 'trajPerLaunch', 'integer_num'),
-                        ('interval', 'interval', 'integer_num'),
-                        ('tolerance', 'tolerance', 'float_num'),
-                        ('error_sampling','err_sampling','integer_num'),
+                        ('total_trajs', 'nframe', 'integer'),
+                        ('start_traj', 'startTraj', 'integer'),
+                        ('traj_per_launch', 'trajPerLaunch', 'integer'),
+                        ('interval', 'interval', 'integer'),
+                        ('tolerance', 'tolerance', 'float'),
+                        ('error_sampling','err_sampling','integer'),
                         ('jobsubmission','jobsubmit', 'string'),
                         ('jobcheck','jobcheck','string'),
                         ('username','username','string'),
-                        ('namd_conf_custom', 'namd_conf', 'yes_or_no'))
+                        ('namd_conf_custom', 'namd_conf', 'yes_or_no'),
+                        ('seek_restartfreq', 'seek_restartfreq', 'integer'))
                               
         with open(file = self.inputPath +'/input.txt') as r:
             for line in r:
