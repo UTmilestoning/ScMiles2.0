@@ -226,8 +226,8 @@ def milestoning(parameter):
     np.save(outputpath + '/ms_index.npy', ms.ms_index)
     
     compute(parameter)
-    log("Computing finished. Mean first passage time: {:20.7f} fs".format(parameter.MFPT))  
     backup(parameter, files)
+    log("Computing finished. Mean first passage time: {:20.7f} fs".format(parameter.MFPT))  
     return ms, ms.new, ms.known
 
 

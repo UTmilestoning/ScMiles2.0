@@ -60,19 +60,20 @@ class milestones:
                 MS_list.add(name)
             return MS_list
         elif status == 1:
-            MS_list = self.__read_milestone_folder()
+            MS_list = self.read_milestone_folder()
             self.parameter.finished_constain = MS_list.copy()
             return MS_list
         else:
             while True:    
             #   free runs from each anchors, markdown once it reaches another cell (i.e. closer to another anchor ).
+                MS_list = self.read_milestone_folder()
+                if MS_list: 
+                    if network_check(self.parameter, MS_list=MS_list) == True:
+                        break
                 self.__seek_milestones()
-                MS_list = self.__read_milestone_folder()
-            #    check if reactant and product are connected.
-                if network_check(self.parameter, MS_list=MS_list) == True:
-                    break
+            #    check if reactant and product are connected
             # read folders to get the milestones list 
-            MS_list = self.__read_milestone_folder()
+            MS_list = self.read_milestone_folder()
             return MS_list
 
     def get_initial_ms(self, path):
@@ -140,37 +141,52 @@ class milestones:
     def __seek_milestones(self):
         from shutil import copy
         milestones = set()
-        filePath = os.path.dirname(os.path.abspath(__file__)) 
-        seekdir = os.path.abspath(os.path.join(filePath, os.pardir)) + '/crd/seek'
-        pardir = os.path.abspath(os.path.join(filePath, os.pardir)) 
         
+        launch = False
         for an in range(1, self.parameter.AnchorNum+1):
-            initialNum = self.__get_next_frame_num(seekdir + '/structure' + str(an))
-            for i in range(self.parameter.initial_traj):
-                if not os.path.exists(seekdir + '/structure' + str(an) + '/' + str(i + initialNum)):
-                    os.makedirs(seekdir + '/structure' + str(an) + '/' + str(i + initialNum))
-                self.__traj_from_anchors(an, i + initialNum)
+            initialNum = self.__get_next_frame_num(self.parameter.seekPath + '/structure' + str(an))
+            if self.parameter.restart == True:
+                end_number = initialNum
+                beg_number = 1
+            else:
+                end_number = initialNum + self.parameter.initial_traj
+                beg_number = initialNum
+            for i in range(beg_number, end_number):
+                if not os.path.exists(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i)):
+                    os.makedirs(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i))
+                if self.parameter.restart == True and os.path.isfile(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i) + '/stop.colvars.state'):
+                    continue
+                launch = True                        
+                self.__traj_from_anchors(an, i)
                 
-        log("{} trajectories started from each anchor, run for {} ps.".format(self.parameter.initial_traj, self.parameter.initialTime))
-        
-        finished = []
-        while True:
-            for i in range(1, self.parameter.AnchorNum + 1):
-                MSname = 'a' + str(i)
-                if not run(self.parameter).check(MSname=MSname):
-                    continue
-                elif MSname in finished:
-                    continue
-                else:
-                    finished.append(MSname)
-            if len(finished) == self.parameter.AnchorNum:
-                break
+        if self.parameter.restart == False:        
+            log("{} trajectories started from each anchor, run for {} ps.".format(self.parameter.initial_traj, self.parameter.initialTime))
+        elif launch == True:
+            log("Remaining trajectories have been launched")
+        elif launch == False:
+            print('No new trajectories launched for this iteration')        
+
+        if launch == True:
+            finished = []
+            while True:
+                for i in range(1, self.parameter.AnchorNum + 1):
+                    MSname = 'a' + str(i)
+                    if self.parameter.restart == True and launch == False:
+                        finished.append(MSname)
+                    if not run(self.parameter).check(MSname=MSname):
+                        continue
+                    elif MSname in finished:
+                        continue
+                    else:
+                        finished.append(MSname)
+                if len(finished) == self.parameter.AnchorNum:
+                    break
             time.sleep(60)
         
         for i in range(1, self.parameter.AnchorNum + 1):
-            curt_frame = self.__get_next_frame_num(seekdir + '/structure' + str(i))
+            curt_frame = self.__get_next_frame_num(self.parameter.seekPath + '/structure' + str(i))
             for traj in range(1, curt_frame):
-                path = seekdir + '/structure' + str(i) + '/' + str(traj)
+                path = self.parameter.seekPath + '/structure' + str(i) + '/' + str(traj)
                 if not os.path.exists(path):
                     continue
                 if os.path.isfile(path + '/end.txt'):
@@ -181,7 +197,7 @@ class milestones:
                 name = 'MS' + str(final_ms[0]) + '_' + str(final_ms[1])
                 if name in milestones:
                     continue
-                ms_path = pardir + '/crd/' + str(final_ms[0]) + '_' + str(final_ms[1])
+                ms_path = self.parameter.crdPath + '/' + str(final_ms[0]) + '_' + str(final_ms[1])
                 if os.path.exists(ms_path):
                     continue          
                 elif not os.path.isfile(path + '/' + self.parameter.outputname + '.restart.coor'):
@@ -194,10 +210,11 @@ class milestones:
                         copy(path + '/' + self.parameter.outputname + '.xst', ms_path + '/sample.xsc')
                     milestones.add(name)
 
-        log("{} milestomes have been identified.".format(len(milestones)))  
+        log("{} milestones have been identified.".format(len(milestones)))  
+        self.parameter.restart = False
         return milestones  
 
-    def __read_milestone_folder(self):
+    def read_milestone_folder(self):
         filePath = os.path.dirname(os.path.abspath(__file__)) 
         pardir = os.path.abspath(os.path.join(filePath, os.pardir)) + '/crd'
         MS_list = set()

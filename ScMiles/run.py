@@ -15,6 +15,7 @@ from shutil import copyfile
 #from find_milestone import *
 #from milestones import *
 from namd_conf_custom import *
+from additional_functions import *
 
 
 class run:
@@ -33,27 +34,43 @@ class run:
 
     def submit(self, a1=None, a2=None, snapshot=None, frame=None, initial=None, initialNum=None):
         '''job submission'''
-        newScript = self.__prepare_script(a1, a2, snapshot, initial, initialNum)
-        self.__prepare_namd(a1, a2, snapshot,frame, initial, initialNum)
         
         lst = sorted([a1, a2])
         MSpath = self.parameter.crdPath + '/' + str(lst[0]) + '_' + str(lst[1])
         
         if snapshot is not None:
+            script_path = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot) + '/submit'
+            namd_path = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot) + '/free.namd'
             origColvar = self.parameter.ScMilesPath + "/colvar_free.conf"
             destColvar = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot) + "/colvar_free.conf"
         elif initial is not None:
+            script_path = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum) + '/submit'
+            namd_path = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum) + '/free.namd'
             origColvar = self.parameter.ScMilesPath + "/colvar_free.conf"
             destColvar = self.parameter.seekPath + "/structure" + str(a1) + "/" + str(initialNum) + "/colvar_free.conf"
         else:
+            script_path = MSpath + '/submit'
+            namd_path = MSpath + '/sample.namd'
             origColvar = self.parameter.ScMilesPath + "/colvar.conf"
             destColvar = MSpath + "/colvar.conf"
         
-        copy(origColvar, destColvar)    
-             
+        if self.parameter.restart == True:
+            if not os.path.isfile(destColvar):
+                copy(origColvar, destColvar)
+            if not os.path.isfile(script_path):
+                newScript = self.__prepare_script(a1, a2, snapshot, initial, initialNum)
+            else:
+                newScript = script_path
+            if not os.path.isfile(namd_path):
+                self.__prepare_namd(a1, a2, snapshot, frame, initial, initialNum)
+        else:
+            copy(origColvar, destColvar)
+            newScript = self.__prepare_script(a1, a2, snapshot, initial, initialNum)
+            self.__prepare_namd(a1, a2, snapshot, frame, initial, initialNum)
+            
         while True:
             out = subprocess.check_output([self.parameter.jobcheck,'-u', self.parameter.username]).decode("utf-8").split('\n')
-            if len(out) -2 < 999999999:  # allowed number of jobs
+            if len(out) -2 < self.parameter.max_jobs:  # allowed number of jobs
                 subprocess.run([self.parameter.jobsubmit,newScript])
                 break
             else:
@@ -131,7 +148,7 @@ class run:
                 if snapshot is not None:
                     path = MSpath + '/' + str(self.parameter.iteration) + '/' + str(snapshot) 
                 elif initial is not None:
-                    path = seekpath + '/structure' + str(a1) + "/" + str(initialNum)
+                    path = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum)
                 else:
                     path = MSpath 
                     

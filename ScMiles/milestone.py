@@ -36,12 +36,11 @@ class milestone:
         self.t_hash = {}
 
     def __repr__(self) -> str:
-        return ('Started from {} milestones. {} new milestone(s) '
-                .format(len(self.known), len(self.new)))
+        return ('Started from {} milestones. {} new milestone(s) '.format(len(self.known), len(self.new)))
 
     def read_anchors(self, path: str) -> None:
         import pandas as pd
-        arr = pd.read_fwf(path, header=None).values
+        arr = pd.read_table(path, delimiter='\s+', header=None).values
         self.anchors = arr
     
     def get_anchor(self, anchor1: int):

@@ -27,7 +27,8 @@ class parameters:
                  outputname=None, namd_conf=None, AnchorPath=None, AnchorNum=None,  
                  new_anchor=None, anchor_dist=None, jobsubmit=None, jobcheck=None,
                  anchors=None, atomNumbers=None, error=None, MFPT=None, kij=None, 
-                 index=None, flux=None, sing=None, seek_restartfreq=None) -> None:
+                 index=None, flux=None, sing=None, seek_restartfreq=None, max_jobs=None,
+                 colvarNumber=None, pause=None) -> None:
 
         self.iteration = 0    # current iteration number
         self.method = 0       # 0 for classic milestoning; 1 for exact milestoning: iteration
@@ -85,8 +86,11 @@ class parameters:
         self.kij = []       #kij matrix
         self.index = []     # milestone index
         self.flux = []      #flux
+        self.colvarNumber = colvarNumber
         self.seek_restartfreq = 1000
         self.anchors = anchors
+        self.max_jobs = 9999999
+        self.split_jobs = False
         self.ScMilesPath = os.path.dirname(os.path.abspath(__file__))
         self.parentDirectory = os.path.abspath(os.path.join(self.ScMilesPath, os.pardir))
         self.crdPath = os.path.join(self.parentDirectory, 'crd')
@@ -103,24 +107,25 @@ class parameters:
         import pandas as pd
         import re
         from log import log
+        
 
-        parameter_list= (('method', 'method', 'integer'), 
-                        ('inital_iteration', 'iteration','minus_one'),
+        parameter_list= (('method', 'method', 'integer'),
                         ('max_iteration', 'maxIteration', 'integer'),
                         ('milestoneSearch','milestone_search', 'integer'),
                         ('pbc', 'pbc', 'replace_comma'),
-                        ('structure', 'structure', 'no_type'),
-                        ('coordinates', 'coordinates', 'no_type'),
-                        ('outputname', 'outputname', 'no_type'),
+                        ('structure', 'structure', 'string'),
+                        ('coordinates', 'coordinates', 'string'),
+                        ('outputname', 'outputname', 'string'),
                         ('NVT', 'NVT', 'yes_or_no'),
                         ('time_step','timeFactor','float'),
                         ('initial_traj','initial_traj','integer'),
                         ('initial_time', 'initialTime', 'integer'),
                         ('ignore_new_ms','ignorNewMS', 'yes_or_no'),
-                        ('colvarType', 'colvarType', 'no_type'),
+                        ('colvarNumber', 'colvarNumber', 'integer'),
+                        ('colvarType', 'colvarType', 'string'),
                         ('custom_colvar', 'colvarsNum', 'integer'),
-                        ('colvarsTrajFrequency', 'colvarsTrajFrequency', 'no_type'),
-                        ('colvarsRestartFrequency', 'colvarsRestartFrequency', 'no_type'),
+                        ('colvarsTrajFrequency', 'colvarsTrajFrequency', 'string'),
+                        ('colvarsRestartFrequency', 'colvarsRestartFrequency', 'string'),
                         ('customColvars','customColvars', 'yes_or_no'),
                         ('force_const', 'forceConst', 'integer'),
                         ('anchorsNum', 'AnchorNum', 'integer'),
@@ -138,7 +143,10 @@ class parameters:
                         ('jobcheck','jobcheck','string'),
                         ('username','username','string'),
                         ('namd_conf_custom', 'namd_conf', 'yes_or_no'),
-                        ('seek_restartfreq', 'seek_restartfreq', 'integer'))
+                        ('restart', 'restart', 'yes_or_no'),
+                        ('seek_restartfreq', 'seek_restartfreq', 'integer'),
+                        ('max_jobs', 'max_jobs', 'integer'),
+                        ('split_jobs', 'split_jobs', 'integer'))
                               
         with open(file = self.inputPath +'/input.txt') as r:
             for line in r:
@@ -161,13 +169,9 @@ class parameters:
                             rm = line.replace(","," ").replace("  "," ").split(" ")
                             rm.pop(0)
                             setattr(self, item[1], list(map(int, rm)))
-                        elif item[2] == 'no_type':
-                            setattr(self, item[1], info[1])
                         elif item[2] == 'string':
                             setattr(self, item[1], str(info[1]))
-                        elif item[2] == 'minus_one':
-                            setattr(self, item[1], int(info[1]) - 1) 
-                      
+            
         self.trajWidths = [13]
         for i in range(self.colvarsNum + self.AnchorNum):
             self.trajWidths.append(23)
@@ -180,7 +184,27 @@ class parameters:
                     line = line.split("\n")
                     self.nodes.append(str(line[0]))
 
-        self.anchors = pd.read_fwf(self.AnchorPath, header=None).values
+        if os.path.exists(self.crdPath) and self.restart == False:
+            print('You have a directory called "crd" and have designated that restart = False.')
+            print('Please enter the number next to the option you would like to choose')
+            print('1. I would like to quit the simulation and move/delete my crd files')
+            print('2. I would like to turn restart on and continue the simulation where I left off \n')
+            user_input = input()
+            while True:
+                if user_input == '1':
+                    self.correctParameters = False
+                    return
+                elif user_input == '2':
+                    self.restart = True
+                    break
+                else:
+                    user_input = input('Invalid input. Please choose an option \n\n')
+        
+        self.anchors = pd.read_table(self.AnchorPath, delimiter='\s+', header=None).values
+        if self.colvarNumber != len(self.anchors[0]):
+            self.correctParameters = False
+            print('Number of columns in anchors.txt ({}) does not match the colvarNumber specified ({}) in input.txt. Please make sure these numbers match'
+                  .format(len(self.anchors[0]), self.colvarNumber))
         create_folder(self.crdPath)
         create_folder(self.outputPath)
         create_folder(self.currentPath)
@@ -209,14 +233,14 @@ class parameters:
                     self.sampling_interval = int(re.findall(r"[-+]?\d*\.\d+|\d+", info[1])[0])
         # initial log file
         if self.restart == False:
-            if os.path.exists(os.path.join(self.currentPath, 'log.txt')):
-                os.remove(os.path.join(self.currentPath, 'log.txt'))           
+            if os.path.exists(os.path.join(self.currentPath, 'log')):
+                os.remove(os.path.join(self.currentPath, 'log'))           
             log(f"Initialized with {self.AnchorNum} anchors.")
                         
 if __name__ == '__main__':
     new = parameters()
     new.initialize()
     print(new.customColvars)
-    print(new.username)
+    print(new.anchors)
 
     

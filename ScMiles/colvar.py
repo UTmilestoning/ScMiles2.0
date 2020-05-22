@@ -18,7 +18,6 @@ Note:
 '''
 
 #from log import log
-import os
 
 
 class colvar:
@@ -34,10 +33,7 @@ class colvar:
         for i in range(1, self.colvars_number + 1):
             self.variables.append("")
         self.initial = initial
-        self.path = os.path.dirname(os.path.abspath(__file__))
-        self.parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.input_dir = self.parent_path + '/my_project_input'
-        self.config_path = self.path + "/colvar_free.conf" if self.free == 'yes' else self.path + "/colvar.conf"
+        self.config_path = self.parameter.ScMilesPath + "/colvar_free.conf" if self.free == 'yes' else self.parameter.ScMilesPath + "/colvar.conf"
 
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -78,7 +74,7 @@ class colvar:
         '''Stores colvar names in array "variables"'''
         count = 0
         section = 1
-        with open(file=self.input_dir + '/colvar.txt') as f:
+        with open(file=self.parameter.inputPath + '/colvar.txt') as f:
             for line in f:
                 if '{' in line:
                     count += 1
@@ -98,7 +94,7 @@ class colvar:
         tmp = []
         count = 0
         section = 1
-        with open(file=self.input_dir+'/colvar.txt') as f:
+        with open(file=self.parameter.inputPath+'/colvar.txt') as f:
             for line in f:
                 if '{' in line:
                     count += 1
@@ -127,7 +123,7 @@ class colvar:
         first = True
         section = 1
         name_get = False
-        with open(file=self.input_dir+'/colvar.txt') as f:
+        with open(file=self.parameter.inputPath+'/colvar.txt') as f:
             for line in f:
                 if '{' in line:
                     first = False
@@ -201,7 +197,7 @@ class colvar:
             print("scriptedColvarForces on", file=fconf)
         if self.parameter.customColvars == True:
             print("", file=fconf)
-            with open(file=self.input_dir + '/custom.colvar') as f_custom:
+            with open(file=self.parameter.inputPath + '/custom.colvar') as f_custom:
                 for line in f_custom:
                     print(line, file=fconf)
         fconf.close()
