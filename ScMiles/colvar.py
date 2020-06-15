@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Apr 30 09:58:01 2020
+
 @author: allis
 """
 
@@ -15,6 +16,8 @@ Two constraints will be considered:
 Note:        
     RMSD(x, anchor_a): the root mean square displacement from anchor_a to x
 '''
+
+#from log import log
 
 
 class colvar:
@@ -31,7 +34,6 @@ class colvar:
             self.variables.append("")
         self.initial = initial
         self.config_path = self.parameter.ScMilesPath + "/colvar_free.conf" if self.free == 'yes' else self.parameter.ScMilesPath + "/colvar.conf"
-
 
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -333,3 +335,4 @@ if __name__ == '__main__':
     print(new.anchors)
     colvar(new, anchor1=1, anchor2=2).generate()
     colvar(new, anchor1=1, anchor2=2, free='yes').generate()
+    

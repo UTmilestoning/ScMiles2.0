@@ -58,7 +58,7 @@ else:
                 
 if "Preparing for more free trajectories" in lastLog:
     parameter.restart = False
-    lastLog = ""
+    lastLog = None
 
 while True:
     free_trajs = traj(parameter, jobs)
@@ -78,7 +78,7 @@ while True:
         
     skip_step = False
     skip_logs = ['Computing...', 'Mean first passage time', 'Preparing for more free trajectories']
-    if parameter.restart == True:
+    if parameter.restart == True and lastLog:
         for item in skip_logs:
             if item in lastLog:
                 skip_step = True
@@ -89,9 +89,10 @@ while True:
     skip_step = False
     # compute kernel, flux, probability, life time of each milstone, and MFPT as well
     skip_logs = ['Mean first passage time', 'Preparing for more free trajectories']
-    for item in skip_logs:
-        if item in lastLog:
-            skip_step = True
+    if lastLog:
+        for item in skip_logs:
+            if item in lastLog:
+                skip_step = True
     if skip_step == False:
         analysis_kernel(parameter)
     

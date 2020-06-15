@@ -28,7 +28,7 @@ class parameters:
                  new_anchor=None, anchor_dist=None, jobsubmit=None, jobcheck=None,
                  anchors=None, atomNumbers=None, error=None, MFPT=None, kij=None, 
                  index=None, flux=None, sing=None, seek_restartfreq=None, max_jobs=None,
-                 colvarNumber=None, pause=None) -> None:
+                 colvarNumber=None, pause=None, traj_per_script=None) -> None:
 
         self.iteration = 0    # current iteration number
         self.method = 0       # 0 for classic milestoning; 1 for exact milestoning: iteration
@@ -101,6 +101,7 @@ class parameters:
         self.AnchorPath = os.path.join(self.inputPath, 'anchors.txt') # file path for anchor
         self.restart = False
         self.correctParameters = True
+        self.traj_per_script = [1,1] #seek and free
           
     def initialize(self):
         import os
@@ -146,7 +147,8 @@ class parameters:
                         ('restart', 'restart', 'yes_or_no'),
                         ('seek_restartfreq', 'seek_restartfreq', 'integer'),
                         ('max_jobs', 'max_jobs', 'integer'),
-                        ('split_jobs', 'split_jobs', 'integer'))
+                        ('split_jobs', 'split_jobs', 'integer'),
+                        ('traj_per_script', 'traj_per_script', 'replace_comma'))
                               
         with open(file = self.inputPath +'/input.txt') as r:
             for line in r:
@@ -183,7 +185,7 @@ class parameters:
                         continue
                     line = line.split("\n")
                     self.nodes.append(str(line[0]))
-
+                    
         if os.path.exists(self.crdPath) and self.restart == False:
             print('You have a directory called "crd" and have designated that restart = False.')
             print('Please enter the number next to the option you would like to choose')
@@ -199,12 +201,14 @@ class parameters:
                     break
                 else:
                     user_input = input('Invalid input. Please choose an option \n\n')
-        
+                            
         self.anchors = pd.read_table(self.AnchorPath, delimiter='\s+', header=None).values
+        '''
         if self.colvarNumber != len(self.anchors[0]):
             self.correctParameters = False
             print('Number of columns in anchors.txt ({}) does not match the colvarNumber specified ({}) in input.txt. Please make sure these numbers match'
                   .format(len(self.anchors[0]), self.colvarNumber))
+        '''
         create_folder(self.crdPath)
         create_folder(self.outputPath)
         create_folder(self.currentPath)

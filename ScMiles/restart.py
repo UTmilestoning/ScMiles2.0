@@ -22,7 +22,7 @@ def read_log(parameter, status):
             line = line.rstrip()
             info = line.split()
             info = info[2:]
-            if 'Iteration' in info[0]:
+            if 'Iteration' in line and 'complete' not in line:
                 parameter.iteration = int(info[2])
             elif 'Reactant and product are connected' in line:
                 #We are done seeking
