@@ -212,16 +212,17 @@ class traj:
 #        print("Iteration # {}".format(self.parameter.iteration))
 #        log("Iteration # {}".format(self.parameter.iteration))
         self.initialize_trajPool()
-        filePath = os.path.dirname(os.path.abspath(__file__)) 
-        pardir = os.path.abspath(os.path.join(filePath, os.pardir))
         
         for MSname in self.parameter.MS_list:
             name = re.findall('\d+', MSname)[0] + '_' + re.findall('\d+', MSname)[1]
-            path = pardir + '/crd/' + name + '/' + str(self.parameter.iteration - 1) + '/'
+            path = self.parameter.crdPath + '/' + name + '/' + str(self.parameter.iteration - 1) + '/'
             for j in range(self.parameter.trajPerLaunch):
                 traj_path = path + str(j+1)
                 if not os.path.exists(traj_path):
                     continue
+                if self.parameter.restart == True:
+                    if os.path.exists(self.parameter.crdPath + '/' + name + '/' + str(self.parameter.iteration) + '/distribution'):
+                        continue
                 end_file = path + str(j+1) + '/end.txt'
                 if not os.path.isfile(end_file) or os.stat(end_file).st_size == 0:
                     continue
@@ -236,7 +237,10 @@ class traj:
 #        print(MS10_11.count_traj('MS11_12'))
         for MSname in self.parameter.MS_list:
             name = re.findall('\d+', MSname)[0] + '_' + re.findall('\d+', MSname)[1]
-            path = pardir + '/crd/' + name + '/' + str(self.parameter.iteration) + '/'
+            path = self.parameter.crdPath + '/' + name + '/' + str(self.parameter.iteration) + '/'
+            if self.parameter.restart == True:
+                if os.path.exists(path + 'distribution'):
+                    continue
             distribution = globals()[MSname].get_distribution(kij, index, flux)
             if distribution == 0:
                 continue
@@ -303,30 +307,31 @@ class traj:
             print('Milestone {} has {} trajectories from enhancement.'\
                   .format(ms, len(traj_lst) - len(continued)), file=f)
     
-    def launch(self, joblist=None):
+    def launch(self, joblist=None, lastLog=None):
         '''launch free trajectories'''
         print("Iteration # {}".format(self.parameter.iteration))
         log("Iteration # {}".format(self.parameter.iteration))
-
-        if self.parameter.method == 1 and self.parameter.iteration > 1:
-            self.iteration_initialize()
         
+        if self.parameter.method == 1 and self.parameter.iteration > 1:
+            if self.parameter.restart == False or (self.parameter.restart == True and "Iteration #" in lastLog):
+                self.iteration_initialize()
+                log('Iteration initialize complete')
+
+                    
         for ms in self.pool:
             self.pool[ms] = 0
         MS_list = self.parameter.MS_list.copy()
-        filePath = os.path.dirname(os.path.abspath(__file__)) 
-        pardir = os.path.abspath(os.path.join(filePath, os.pardir)) + '/crd'
 
+        colvar(self.parameter, free='yes').generate()
+        
         for name in MS_list:
+            launch = False
             [anchor1, anchor2] = list(map(int,(re.findall('\d+', name))))
             next_frame = 1 if self.parameter.method == 1 else self.__snapshots(name)
             MSname = str(anchor1) + '_' + str(anchor2)
-            MSpath = pardir + '/' + MSname
+            MSpath = self.parameter.crdPath + '/' + MSname
             if not os.path.exists(MSpath + '/' + str(self.parameter.iteration)):
                 os.makedirs(MSpath + '/' + str(self.parameter.iteration))
-
-            colvar(self.parameter, free='yes').generate()
-
             for j in range(self.parameter.trajPerLaunch):
                 frame = self.parameter.startTraj + next_frame // self.parameter.trajPerLaunch + j * self.parameter.interval
     #            frame = parameter.startTraj + (next_frame + j) * parameter.interval
@@ -335,20 +340,25 @@ class traj:
                 folderPath = MSpath + '/' + str(self.parameter.iteration) + "/" + str(j+next_frame)
                 if not os.path.exists(folderPath):
                     os.makedirs(folderPath)
+                if self.parameter.restart == True and os.path.isfile(folderPath + '/stop.colvars.state'):
+                    continue
                 milestones(self.parameter).get_initial_ms(folderPath)
 #                print(name1, j, next_snapshot, frame)
+                launch = True
                 self.jobs.submit(a1=anchor1, a2=anchor2, snapshot=j+next_frame, frame=frame)
-
-            print(str(datetime.now()))
-            print("{} short trajectories started from milestone {}..."\
-                  .format(self.parameter.trajPerLaunch, name))
+            if launch == True:
+                print(str(datetime.now()))
+                print("Short trajectories started from milestone {}..."\
+                      .format(name))
+            else:
+                print('No new trajectories launched from {} this iteration'.format(name))
         log("{} short trajectories started from each milestone.".format(self.parameter.trajPerLaunch))
         self.check()
         count = 0
         for name in MS_list:
             [anchor1, anchor2] = list(map(int,(re.findall('\d+', name))))
             MSname = str(anchor1) + '_' + str(anchor2)
-            MSpath = pardir +  '/' + MSname 
+            MSpath = self.parameter.crdPath +  '/' + MSname 
             for j in range(self.parameter.nframe):
                 path = MSpath + "/" + str(self.parameter.iteration) + "/" + str(j+1)
                 if not os.path.exists(path):

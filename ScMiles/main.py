@@ -8,7 +8,7 @@ Created on Mon Nov 19 11:06:15 2018
 Main script which inclues major workflow.
 
 """
-
+import sys
 import time
 import numpy as np
 from parameters import *
@@ -18,6 +18,7 @@ from sampling import *
 from milestones import *
 from analysis import analysis_kernel
 from traj import *
+from restart import *
 
 # run free trajectories without sampling
 import argparse
@@ -32,14 +33,32 @@ MFPT_temp = 1
 MFPT_converged = False
 parameter = parameters()
 parameter.initialize()
+if parameter.correctParameters == False:
+    print('Please update your input files and restart ScMiles.')
+    sys.exit()
 jobs = run(parameter)
 samples = sampling(parameter, jobs)
+lastLog = ""
 
 # initialize with reading anchor info and identifying milestones 
-parameter.MS_list = milestones(parameter).initialize(status=status)
-
-# initialize iteration number
-# parameter.iteration = 0
+if parameter.restart == False:
+    parameter.MS_list = milestones(parameter).initialize(status=status)
+else:
+    seek, sample, lastLog = read_log(parameter, status)
+    if seek == False:
+        log('ScMiles restarted. Continuing seek step.')
+        parameter.MS_list = milestones(parameter).initialize(status=status)
+    elif sample == False:
+        log('ScMiles restarted. Continuing sampling step.')
+        parameter.MS_list = milestones(parameter).read_milestone_folder()
+    else:
+        #Check for new sampling
+        log('ScMiles restarted. Continuing free trajectories step.')
+        parameter.MS_list = milestones(parameter).read_milestone_folder()
+                
+if "Preparing for more free trajectories" in lastLog:
+    parameter.restart = False
+    lastLog = ""
 
 while True:
     free_trajs = traj(parameter, jobs)
@@ -47,21 +66,37 @@ while True:
     # apply harmonic constraints that populate samples at each milestones.
     if parameter.MS_list != parameter.finished_constain:
         samples.constrain_to_ms()   # start to constrain
-        time.sleep(60)
-        
+    
     samples.check_sampling()    # check if the samplings are finished
 
     # next iteration; for iteration methods
-    if parameter.method == 1:
-        parameter.iteration += 1 
-    else:
-        parameter.iteration = 1 
-            
+    if parameter.restart == False:
+        if parameter.method == 1:
+            parameter.iteration += 1 
+        else:
+            parameter.iteration = 1 
+        
+    skip_step = False
+    skip_logs = ['Computing...', 'Mean first passage time', 'Preparing for more free trajectories']
+    if parameter.restart == True:
+        for item in skip_logs:
+            if item in lastLog:
+                skip_step = True
     # lauch free runs from the samples
-    current_snapshot = free_trajs.launch()
-    
+    if skip_step == False:
+        current_snapshot = free_trajs.launch(lastLog = lastLog)
+        
+    skip_step = False
     # compute kernel, flux, probability, life time of each milstone, and MFPT as well
-    analysis_kernel(parameter)
+    skip_logs = ['Mean first passage time', 'Preparing for more free trajectories']
+    for item in skip_logs:
+        if item in lastLog:
+            skip_step = True
+    if skip_step == False:
+        analysis_kernel(parameter)
+    
+    parameter.restart = False
+    lastLog = None
     
     # If any NEW milestone has been reached
     if len(parameter.MS_new) != 0 and not parameter.ignorNewMS:

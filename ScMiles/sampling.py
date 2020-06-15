@@ -40,7 +40,7 @@ class sampling:
         import os
         MS_list = self.parameter.MS_list.copy()
         finished = self.parameter.Finished.copy()
-        # rootPath = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sleep = False
         for name in MS_list:
             if name in finished or name in self.parameter.finished_constain:
                 continue
@@ -49,14 +49,18 @@ class sampling:
             lst = re.findall('\d+', name)
             anchor1 = int(lst[0])
             anchor2 = int(lst[1])
-            restartsPath = self.parent_path + '/crd/' + str(anchor1) + '_' + str(anchor2) + '/restarts'
+            restartsPath = self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2) + '/restarts'
+            if self.parameter.restart == True:
+                if os.path.isfile(self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2) + '/' + self.parameter.outputname + '.colvars.state'):
+                    continue
             if not os.path.exists(restartsPath):
-                constrain = colvar(self.parameter, anchor1, anchor2)
-                constrain.generate()
+                colvar(self.parameter, anchor1, anchor2).generate()
                 self.jobs.submit(a1=anchor1, a2=anchor2)
-                
+                sleep = True
         log("{} milestones identified.".format(str(len(MS_list))))             
-        log("Sampling on each milestone...")   
+        if sleep == True:
+            log("Sampling on each milestone...")  
+            time.sleep(60)
 
     def check_sampling(self):
         import re
@@ -81,8 +85,8 @@ class sampling:
             if finished | self.parameter.finished_constain == MS_list:
                 self.parameter.Finished = finished.copy()
                 log("Finished sampling on all milestones.")    
-                log("Ready to launch free trajectories.") 
                 self.move_restart(self.parameter.MS_list)
+                log("Ready to launch free trajectories.") 
                 return self.parameter.Finished
             print("Next check in 600 seconds. {}".format(str(datetime.now())))
             time.sleep(600)   # 600 seconds
@@ -95,7 +99,7 @@ class sampling:
         for name in names:
             [anchor1, anchor2] = list(map(int,(re.findall('\d+', name))))
             ms = str(anchor1) + '_' + str(anchor2)
-            filePath = self.parent_path + '/crd/' + ms
+            filePath = self.parameter.crdPath + '/' + ms
             restartFolder = filePath + '/restarts'
             if not os.path.exists(restartFolder):
                 os.makedirs(restartFolder)

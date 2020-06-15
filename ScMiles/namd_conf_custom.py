@@ -48,8 +48,7 @@ def namd_conf_read(inputdir,anchor):
 #                print(origin)
                 break
 #    print(vector, origin, anchor)
-    return vector, origin
-
+    return vector, origin  
 
 if __name__ == '__main__':
     namd_conf_mod('.', 'sample.namd', 1)
