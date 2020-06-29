@@ -224,12 +224,16 @@ def compute(parameter):
     MFPT2_samples = []
     energy_err = []
     MFPT_err = []
-    MFPT_err2 = []    
+    MFPT_err2 = []   
+    
+    #added on 6/27/20 to change to std dev of the mean
+    for i in range(len(t_std)):
+        t_std[i] = t_std[i]/sqrt(parameter.trajPerLaunch)
     
     for i in range(parameter.err_sampling):
         k_err = k_error(np.mat(kc))
-        if not isinstance(t_std,float):
-            t_std = tt
+        #if not isinstance(t_std,float):
+            #t_std = tt
         t_err = t_error(tt, t_std)
         q_temp = flux(k_err)
         p_temp = prob(q_temp,tt)
