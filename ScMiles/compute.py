@@ -226,10 +226,13 @@ def compute(parameter):
     MFPT_err = []
     MFPT_err2 = []    
     
+    for i in range(len(t_std)):
+        t_std[i] = t_std[i]/sqrt(parameter.trajPerLaunch)
+    
     for i in range(parameter.err_sampling):
         k_err = k_error(np.mat(kc))
-        if not isinstance(t_std,float):
-            t_std = tt
+        #if not isinstance(t_std,float):
+            #t_std = tt
         t_err = t_error(tt, t_std)
         q_temp = flux(k_err)
         p_temp = prob(q_temp,tt)
@@ -238,6 +241,7 @@ def compute(parameter):
         MFPT_samples.append(MFPT_er)
         MFPT_er2 = MFPT2(parameter, k_err, t_err)
         MFPT2_samples.append(MFPT_er2)
+    
     
 #    MFPT_samples = np.log10(MFPT_samples)
 #    import matplotlib.pyplot as plt
