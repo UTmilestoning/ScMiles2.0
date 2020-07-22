@@ -339,7 +339,7 @@ class run:
                             info[1] = self.parameter.outputname + '.xsc'
                     if self.parameter.namd_conf == True and not initial and self.parameter.milestone_search == 1:
                         info[0] = 'extendedSystem'
-                        info[1] = './seek.xsc'
+                        info[1] = './sample.xsc'
                         
                                 
                 if "restartsave" in line:
