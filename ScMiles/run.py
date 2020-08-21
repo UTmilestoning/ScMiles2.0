@@ -32,42 +32,35 @@ class run:
     def __repr__(self) -> str:
         return ('Submit jobs.')
 
-    def submit(self, a1=None, a2=None, snapshot=None, frame=None, initial=None, initialNum=None):
-        '''job submission'''
-        
+    def prepare_trajectory(self, a1=None, a2=None, snapshot=None, frame=None, initial=None, initialNum=None, script=None):
+        #prepare script and namd file
         lst = sorted([a1, a2])
-        MSpath = self.parameter.crdPath + '/' + str(lst[0]) + '_' + str(lst[1])
-        
-        if snapshot is not None:
-            script_path = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot) + '/submit'
-            namd_path = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot) + '/free.namd'
-            origColvar = self.parameter.ScMilesPath + "/colvar_free.conf"
-            destColvar = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot) + "/colvar_free.conf"
-        elif initial is not None:
-            script_path = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum) + '/submit'
-            namd_path = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum) + '/free.namd'
-            origColvar = self.parameter.ScMilesPath + "/colvar_free.conf"
-            destColvar = self.parameter.seekPath + "/structure" + str(a1) + "/" + str(initialNum) + "/colvar_free.conf"
+        if snapshot:
+            path = self.parameter.crdPath + '/' + str(lst[0]) + '_' + str(lst[1]) + '/' + str(self.parameter.iteration) + "/" + str(snapshot)
+        elif initial:
+            path = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum)
         else:
-            script_path = MSpath + '/submit'
-            namd_path = MSpath + '/sample.namd'
+            path = self.parameter.crdPath + '/' + str(lst[0]) + '_' + str(lst[1])
+        script_path = path + '/submit'
+        if snapshot or initial:
+            origColvar = self.parameter.ScMilesPath + "/colvar_free.conf"
+            destColvar = path + "/colvar_free.conf"
+            namd_path= path + '/free.namd'
+        else:
             origColvar = self.parameter.ScMilesPath + "/colvar.conf"
-            destColvar = MSpath + "/colvar.conf"
-        
-        if self.parameter.restart == True:
-            if not os.path.isfile(destColvar):
-                copy(origColvar, destColvar)
-            if not os.path.isfile(script_path):
-                newScript = self.__prepare_script(a1, a2, snapshot, initial, initialNum)
-            else:
-                newScript = script_path
-            if not os.path.isfile(namd_path):
-                self.__prepare_namd(a1, a2, snapshot, frame, initial, initialNum)
-        else:
-            copy(origColvar, destColvar)
+            destColvar = path + "/colvar.conf"
+            namd_path = path + '/sample.namd'
+            script = True        
+
+        if not os.path.isfile(script_path) and not os.path.isfile(script_path + '_done') and script == True:
             newScript = self.__prepare_script(a1, a2, snapshot, initial, initialNum)
+        if not os.path.isfile(namd_path):
             self.__prepare_namd(a1, a2, snapshot, frame, initial, initialNum)
+        if not os.path.isfile(destColvar):
+            copy(origColvar, destColvar)
             
+    def submit(self, newScript):
+        #job submission       
         while True:
             out = subprocess.check_output([self.parameter.jobcheck,'-u', self.parameter.username]).decode("utf-8").split('\n')
             if len(out) -2 < self.parameter.max_jobs:  # allowed number of jobs
@@ -75,12 +68,14 @@ class run:
                 break
             else:
                 time.sleep(60)
-
-    def check(self, a1=None, a2=None, MSname=None, JobName=None):
+                
+    def check(self, a1=None, a2=None, MSname=None, JobName=None, SampleName=None):
         '''check queue to see if all jobs are finished'''
         out = subprocess.check_output([self.parameter.jobcheck,'-u', self.parameter.username]).decode("utf-8").split('\n')
         if a1 is not None and a2 is not None:
-            name = 'MS' + str(a1) + '_' + str(a2)
+            name = 'MS' + '_' + str(a1) + '_' + str(a2)
+        if SampleName is not None:
+            name = SampleName
         if MSname is not None:
             name = MSname
         if JobName is not None:
@@ -92,77 +87,100 @@ class run:
             job.append(list(filter(None, out[i].split(' '))))
             
         for i in range(len(job)):
-            if MSname is not None and job[i][2] == name:
+            if SampleName is not None and job[i][2] == SampleName:
+                return False
+            if MSname is not None and job[i][2].split('_')[0] == name:
                 return False  # not finished
             if JobName is not None and job[i][2].split('_')[0] == name:
                 return False
         return True # finished
     
     def __prepare_script(self, a1, a2, snapshot=None, initial=None, initialNum=None):
-        '''mordify job submission file'''
+        '''modify job submission file'''
         from fileinput import FileInput
-        import os
+        if initial:
+            start_script = initialNum
+            end_script = self.parameter.traj_per_script[0] + initialNum - 1
+        elif snapshot:
+            start_script = snapshot
+            end_script = self.parameter.traj_per_script[1] + snapshot - 1
 
+        if not snapshot and not initial:
+            pass
+        elif (initial and self.parameter.traj_per_script[0] == 1) or (snapshot and self.parameter.traj_per_script[1] == 1):
+            script_number = str(start_script)
+        elif end_script > 1:
+            script_number = str(start_script) + '_' + str(end_script)
+        else:
+            script_number = str(start_script)
+            
         lst = sorted([a1, a2])
         name = str(lst[0]) + '_' + str(lst[1])
         MSpath = self.parameter.crdPath + '/' + name 
     
-        if snapshot is not None:
+        if snapshot:
             newScriptPath = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot)
             newScript = newScriptPath + "/submit"
-        elif initial is not None:
+            path = MSpath + '/' + str(self.parameter.iteration) + '/' + str(snapshot)
+            name = 'MILES' + '_' + str(a1) + '_' + str(a2) + '_' + script_number
+            namd_file = './free.namd'
+        elif initial:
             newScriptPath = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum)
             newScript = newScriptPath + '/submit'
+            path = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum)
+            name = 'a' + str(a1) + '_' + script_number
+            namd_file = './free.namd'
         else:
             newScriptPath = MSpath
             newScript = newScriptPath + "/MS" + name
+            path = MSpath
+            name = 'MS' + '_' + str(a1) + '_' + str(a2)
+            namd_file = './sample.namd'
+            
         create_folder(newScriptPath)
         copyfile(self.parameter.inputPath + '/submit', newScript)
 
         with FileInput(files=newScript, inplace=True) as f:
             for line in f:
                 line = line.strip()
-#                line = line.lower()
                 info = line.split()
-#                 info = line.split("#")[0].split()
                 if not info:
                     continue
-                                  
-                if "source" in line:
+                keyword = None
+                for item in ['source', 'name', 'path', 'namd']:
+                    if item in line:
+                        keyword = item
+                        place = info.index(item)
+                        break
+                if keyword == None:
+                    print(" ".join(str(x) for x in info))
+                    continue
+                if keyword == 'source':
                     if self.parameter.nodes:
                         import numpy as np
                         rand = np.random.uniform(0,len(self.parameter.nodes),1)
                         info[2] = 'hostname="' + self.parameter.nodes[int(rand)] + '"'
                     else:
-                        info.insert(0, '#')
-                        
-                if "name" in line:
-                    place = info.index('name')
-                    if snapshot is not None:
-                        info[place] = 'MILES' + '_' + str(a1) + '_' + str(a2) + '_' + str(snapshot)
-                    elif initial is not None:
-                        info[place] = 'a' + str(a1)
-                    else:
-                        info[place] = 'MS' + str(a1) + '_' + str(a2) 
-                
-                if snapshot is not None:
-                    path = MSpath + '/' + str(self.parameter.iteration) + '/' + str(snapshot) 
-                elif initial is not None:
-                    path = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum)
-                else:
-                    path = MSpath 
-                    
-                if "path" in line:
-                    place = info.index('path')
+                        info.insert(0, '#')  
+                elif keyword == 'name':
+                    info[place] = name
+                elif keyword == 'path':
                     info[place] = path
-                if "namd" in line:
-                    place = info.index('namd')
-                    if snapshot is None and initial is None:
-                        info[place] = './sample.namd'
-                    else:
-                        info[place] = './free.namd'
-                line = " ".join(str(x) for x in info)
+                elif keyword == 'namd':
+                    info[place] = namd_file
+                    if (initial and self.parameter.traj_per_script[0] != 1) or (snapshot and self.parameter.traj_per_script[1] != 1):
+                        namd_line = (" ".join(str(x) for x in info))
+                        continue
+                line = (" ".join(str(x) for x in info))
                 print(line)
+        
+        if (initial and self.parameter.traj_per_script[0] > 1) or (snapshot and self.parameter.traj_per_script[1] > 1):         
+            fconf = open(newScript, 'a')
+            for i in range(start_script, end_script + 1):
+                print('cd ../' + str(i), file=fconf)
+                print(namd_line, file=fconf)
+            fconf.close()
+        
         return newScript     
 
     def __prepare_namd(self, a1=None, a2=None, snapshot=None,frame=None, initial=None, initialNum=None):
@@ -184,9 +202,9 @@ class run:
             MSpath = self.parameter.crdPath + '/' + name
             filename = "/" + str(self.parameter.iteration) + "/" + str(snapshot) + "/free.namd"
             if os.path.isfile(MSpath + "/" + str(self.parameter.iteration) + "/" + str(snapshot) + '/enhanced'):
-                enhanced== 1
+                enhanced = 1
             else:
-                enhanced =0
+                enhanced = 0
         else:
             template = self.parameter.inputPath + "/sample.namd"
             MSpath = self.parameter.crdPath + '/' + name
@@ -295,7 +313,7 @@ class run:
                 if "coordinates" in line and 'bincoordinates' not in line.lower():
                     info[1] = self.parameter.inputPath + '/pdb/' + str(lst[0]) + ".pdb"
                     if snapshot is None and initial is None and self.parameter.milestone_search == 1:
-                        info[1] = "./seek.ms.pdb" 
+                        info[1] = "./seek.ms.pdb"
                         
                 if "outputname" in line:
                     info[1] = self.parameter.outputname
@@ -337,7 +355,7 @@ class run:
                                       str(frame * self.parameter.sampling_interval) + '.xsc'
                         else:
                             info[1] = self.parameter.outputname + '.xsc'
-                    if self.parameter.namd_conf == True and not initial and self.parameter.milestone_search == 1:
+                    elif self.parameter.namd_conf == True and not initial and self.parameter.milestone_search == 1:
                         info[0] = 'extendedSystem'
                         info[1] = './sample.xsc'
                         
@@ -420,11 +438,17 @@ def get_initial_ms(path):
 if __name__ == '__main__':
     from parameters import *
     from namd_conf_custom import *
+    from colvar import *
     
     new = parameters()
     new.initialize()
     jobs = run(new)
     new.iteration = 2
-    jobs._run__prepare_namd(a1=2, a2=3, initial='yes', initialNum = 1)
+    new.traj_per_script = 2
+    new.initial_traj = 5
+    colvar(new, free='yes', initial='yes').generate()
+    for i in range(1,6):
+        jobs.prepare_trajectory(a1=1, a2=999, initial='yes', initialNum = i)
+
 
     

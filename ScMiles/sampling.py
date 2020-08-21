@@ -55,7 +55,8 @@ class sampling:
                     continue
             if not os.path.exists(restartsPath):
                 colvar(self.parameter, anchor1, anchor2).generate()
-                self.jobs.submit(a1=anchor1, a2=anchor2)
+                self.jobs.prepare_trajectory(a1=anchor1, a2=anchor2)
+                self.jobs.submit(self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2) + '/MS' + str(anchor1) + '_' + str(anchor2))
                 sleep = True
         log("{} milestones identified.".format(str(len(MS_list))))             
         if sleep == True:
@@ -69,7 +70,8 @@ class sampling:
         MS_list = self.parameter.MS_list.copy()
         while True:
             for name in self.parameter.MS_list:
-                if not self.jobs.check(MSname=name):
+                MSname = name[0:2] + '_' + name[2:]
+                if not self.jobs.check(SampleName=MSname):
                     continue
                 elif name in self.parameter.finished_constain:
                     continue

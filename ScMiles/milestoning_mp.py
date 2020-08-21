@@ -82,7 +82,7 @@ def backup(parameter, files: list) -> None:
             copy(pardir + '/current' + file, backup_Folder + file)
         
 
-def milestoning(parameter):
+def milestoning(parameter, skip_compute):
 #    import multiprocessing as mp
     import pandas as pd
     ms = milestone()
@@ -225,9 +225,14 @@ def milestoning(parameter):
         f1.write('\n'.join([''.join(['{:10.5f}'.format(item) for item in row])for row in k_ave]))   
     np.save(outputpath + '/ms_index.npy', ms.ms_index)
     
-    compute(parameter)
+    if skip_compute == False:
+        compute(parameter)
+        log("Computing finished. Mean first passage time: {:20.7f} fs".format(parameter.MFPT))
+    else:
+        log("Computing skipped this iteration")
     backup(parameter, files)
-    log("Computing finished. Mean first passage time: {:20.7f} fs".format(parameter.MFPT))  
+    from compute import get_start_end_lifetime
+    get_start_end_lifetime(parameter)
     return ms, ms.new, ms.known
 
 

@@ -21,13 +21,13 @@ def namd_conf_mod(inputdir, newNamd, anchor):
             info = line.split()
             if info == []:
                 continue
-            if info[0].lower() == "cellbasisvector1":
+            if info[0].lower() == "cellbasisvector1" and vector:
                 info[1] = vector[0]
-            if info[0].lower() == "cellbasisvector2":
+            if info[0].lower() == "cellbasisvector2" and vector:
                 info[2] = vector[1]
-            if info[0].lower() == "cellbasisvector3":
+            if info[0].lower() == "cellbasisvector3" and vector:
                 info[3] = vector[2]
-            if info[0].lower() == "cellorigin":
+            if info[0].lower() == "cellorigin" and origin:
                 info[1:4] = origin
                 
             line = " ".join(str(x) for x in info)
@@ -35,6 +35,8 @@ def namd_conf_mod(inputdir, newNamd, anchor):
                 
                 
 def namd_conf_read(inputdir,anchor):
+    vector = None
+    origin = None
     pdb = inputdir + '/pdb/' + str(anchor) + '.pdb'
 #    pdb = inputdir + '/1.pdb'
     with open(pdb, 'r') as f:

@@ -184,6 +184,7 @@ def MFPT2(parameter, k, t):
 
 
 def compute(parameter):
+    from math import sqrt
     filePath = os.path.dirname(os.path.abspath(__file__))
     path = os.path.abspath(os.path.join(filePath, os.pardir)) + '/my_project_output'
     path = path + '/current'
@@ -224,9 +225,8 @@ def compute(parameter):
     MFPT2_samples = []
     energy_err = []
     MFPT_err = []
-    MFPT_err2 = []   
+    MFPT_err2 = []    
     
-    #added on 6/27/20 to change to std dev of the mean
     for i in range(len(t_std)):
         t_std[i] = t_std[i]/sqrt(parameter.trajPerLaunch)
     
@@ -242,6 +242,7 @@ def compute(parameter):
         MFPT_samples.append(MFPT_er)
         MFPT_er2 = MFPT2(parameter, k_err, t_err)
         MFPT2_samples.append(MFPT_er2)
+    
     
 #    MFPT_samples = np.log10(MFPT_samples)
 #    import matplotlib.pyplot as plt
@@ -278,7 +279,9 @@ def compute(parameter):
     with open(path + '/committor.txt', 'w+') as f1:
         print('\n'.join([''.join(['{:>15}'.format(str(item)) for item in m])]),file=f1)
         print('\n'.join([''.join(['{:15.8f}'.format(item) for item in np.squeeze(c)])]),file=f1)
-       
+        
+#    get_start_end_lifetime(parameter)  
+    
     if not parameter.sing:
         parameter.MFPT = tau1
     else:
@@ -290,6 +293,65 @@ def compute(parameter):
         index.append(ms_list[i])
     return k, index, q # q_cyc
 
+def get_next_frame_num(path):
+    next_frame = 1
+    while True:
+        if os.path.exists(path + '/' + str(next_frame)):
+            next_frame += 1
+        else:
+            return next_frame
+
+def get_start_end_lifetime(parameter):
+    import pandas as pd
+    import os
+    import re
+    data = []
+    for ms in parameter.MS_list:    
+        lst = re.findall('\d+',ms)
+        name = lst[0] + '_' + lst[1]
+        ms_path = parameter.crdPath + '/' + name + '/' + str(parameter.iteration)
+        next_frame = get_next_frame_num(ms_path)
+        for traj in range(1, next_frame):
+            tmp = []
+            traj_path = ms_path + '/' + str(traj) 
+            if os.path.isfile(traj_path + '/start.txt'):
+                start = pd.read_csv(traj_path + '/start.txt', header=None, delimiter=r'\s+').values.tolist()[0]
+            else:
+                start = ['N','N']
+            if os.path.isfile(traj_path + '/end.txt'):
+                end = pd.read_csv(traj_path + '/end.txt', header=None, delimiter=r'\s+').values.tolist()[0]
+            else:
+                end = ['N','N']
+            if os.path.isfile(traj_path + '/lifetime.txt'):
+                lifetime = pd.read_csv(traj_path + '/lifetime.txt', header=None, delimiter=r'\s+').values.tolist()[0]
+            else:
+                lifetime = 'N'
+            if os.path.isfile(traj_path + '/enhanced'):
+                enhanced = 'Enhanced'
+            else:
+                enhanced = 'NotEnhanced'
+            tmp = [parameter.iteration, start[0], start[1], end[0], end[1], lifetime[0], enhanced, traj_path]
+            '''            
+            tmp.append(str(start[0]))
+            tmp.append(str(start[1]))
+            tmp.append(str(end[0]))
+            tmp.append(str(end[1]))
+            tmp.append(str(lifetime))
+            '''
+            data.append(tmp)
+            #print(data)
+    with open(parameter.currentPath + '/iteration_data.txt', 'w') as f1:
+    	for item in data:
+            f1.write(" ".join(map(str,item)) + '\n')
+    if parameter.iteration == 1:
+        with open(parameter.currentPath + '/all_data.txt', 'w') as f1:
+            f1.write('Iteration start[0] start[1] end[0] end[1] Lifetime Enhancement Filepath')
+            for item in data:
+                f1.write(" ".join(map(str,item)) + '\n')
+    else:
+        with open(parameter.currentPath + '/all_data.txt', 'a') as f1:
+            for item in data:
+                f1.write(" ".join(map(str,item)) + '\n')
 
 if __name__ == '__main__':
     from parameters import *

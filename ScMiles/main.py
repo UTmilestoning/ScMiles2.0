@@ -58,7 +58,7 @@ else:
                 
 if "Preparing for more free trajectories" in lastLog:
     parameter.restart = False
-    lastLog = ""
+    lastLog = None
 
 while True:
     free_trajs = traj(parameter, jobs)
@@ -78,22 +78,23 @@ while True:
         
     skip_step = False
     skip_logs = ['Computing...', 'Mean first passage time', 'Preparing for more free trajectories']
-    if parameter.restart == True:
+    if parameter.restart == True and lastLog:
         for item in skip_logs:
             if item in lastLog:
                 skip_step = True
     # lauch free runs from the samples
     if skip_step == False:
-        current_snapshot = free_trajs.launch(lastLog = lastLog)
+        current_snapshot, skip_compute, new_milestones = free_trajs.launch(lastLog = lastLog)
         
     skip_step = False
     # compute kernel, flux, probability, life time of each milstone, and MFPT as well
     skip_logs = ['Mean first passage time', 'Preparing for more free trajectories']
-    for item in skip_logs:
-        if item in lastLog:
-            skip_step = True
+    if lastLog:
+        for item in skip_logs:
+            if item in lastLog:
+                skip_step = True
     if skip_step == False:
-        analysis_kernel(parameter)
+        analysis_kernel(parameter, skip_compute)
     
     parameter.restart = False
     lastLog = None
@@ -115,13 +116,22 @@ while True:
     if parameter.method == 0 and current_snapshot >= parameter.nframe:
         log("All the snapshots have been used...")
         break
-    
+
+    if skip_compute == False:
+        parameter.finished_constain = parameter.MS_list.copy()    
     # break if reach max iteration
     if parameter.iteration >= parameter.maxIteration:
         log("Reached max iteration...")
         break
-
+    elif skip_compute == True:
+        log('Preparing for more free trajectories...')
+        MFPT_temp = 1
+        parameter.MFPT = 0
+        parameter.Finished = set()
+        for item in new_milestones:
+            parameter.MS_list.add(item[0])
     # if no results
+
     elif np.isnan(parameter.MFPT) or parameter.MFPT < 0:
         log("Preparing for more free trajectories...")
         MFPT_temp = 1

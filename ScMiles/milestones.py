@@ -42,26 +42,20 @@ class milestones:
             if os.path.exists(pdbPath):
                 next_frame += 1
             else:
-                break
-        return next_frame
+                return next_frame
     
-    def __traj_from_anchors(self, anchor, initialNum):
-        colvar(self.parameter, free='yes', initial='yes').generate()      
-        run(self.parameter).submit(a1=anchor, a2=999, initial='yes', initialNum=initialNum)
-
     def initialize(self, status=0):
+        self.parameter.iteration = 0
         MS_list = set()
-        if self.parameter.milestone_search == 0 and status == 0:
-            for i in range(1, self.parameter.AnchorNum):
-                name = 'MS' + str(i) + '_' + str(i + 1)
-                MS_list.add(name)
-            if self.parameter.pbc:
-                name = 'MS' + str(self.parameter.pbc[0]) + '_' + str(self.parameter.pbc[1])
-                MS_list.add(name)
-            return MS_list
-        elif status == 1:
+        if status == 1:
             MS_list = self.read_milestone_folder()
             self.parameter.finished_constain = MS_list.copy()
+            return MS_list
+        elif self.parameter.milestone_search == 0:
+            for i in range(1, self.parameter.AnchorNum):
+                MS_list.add('MS' + str(i) + '_' + str(i + 1))
+            if self.parameter.pbc:
+                MS_list.add('MS' + str(self.parameter.pbc[0]) + '_' + str(self.parameter.pbc[1]))
             return MS_list
         else:
             while True:    
@@ -70,27 +64,18 @@ class milestones:
                 if MS_list: 
                     if network_check(self.parameter, MS_list=MS_list) == True:
                         break
-                self.__seek_milestones()
-            #    check if reactant and product are connected
+                self.seek_milestones()
+            # check if reactant and product are connected
             # read folders to get the milestones list 
-            MS_list = self.read_milestone_folder()
             return MS_list
 
     def get_initial_ms(self, path):
         path_split = path.split("/")
-#        if self.parameter.iteration == 1:
-    #        print(path_split)
         initial_ms = list(map(int,(re.findall('\d+', path_split[-3]))))
-    #        initial_ms = [int(path_split[-3].split("_")[0]), int(path_split[-3].split("_")[1])]
-#        else:
-#            path_split[-2] = str(int(path_split[-2]) - 1)
-#            path_prev = "/" + os.path.join(*path_split)
-#            ms = pd.read_csv(path_prev + '/end.txt',header=None,delimiter=r'\s+').values.tolist()
-#            initial_ms = [ms[0][0], ms[0][1]]
         with open(path + '/start.txt', 'w+') as f1:
             print(initial_ms[0], initial_ms[1], file=f1)    
         return initial_ms
-    
+        
     def get_final_ms(self, path):
         state = path + "/stop.colvars.state"
         if not os.path.isfile(state):
@@ -110,7 +95,6 @@ class milestones:
                 try:
                     RMSDs_prev = pd.read_fwf(traj, widths=self.parameter.trajWidths).values[-1,firstRMSD:].astype(np.float64).tolist()
                 except:
-                    print(traj)
                     return -1, [0, 0]
                 final_ms[1] = RMSDs_prev.index(sorted(RMSDs_prev)[0]) + 1 
             else:
@@ -136,43 +120,50 @@ class milestones:
         if not os.path.isfile(time_info):
             with open(time_info, 'w+') as f1:
                 print(lifetime, file=f1)    
-        return lifetime, final_ms
-
-    def __seek_milestones(self):
+        return lifetime, final_ms            
+        
+    def seek_milestones(self):
         from shutil import copy
         milestones = set()
-        
-        launch = False
-        for an in range(1, self.parameter.AnchorNum+1):
+        launch = []
+        for i in range(self.parameter.AnchorNum):
+            launch.append(False)
+        #prepare scripts
+        colvar(self.parameter, free='yes', initial='yes').generate()  
+        for an in range(1, self.parameter.AnchorNum + 1):
             initialNum = self.__get_next_frame_num(self.parameter.seekPath + '/structure' + str(an))
-            if self.parameter.restart == True:
-                end_number = initialNum
-                beg_number = 1
+            if self.parameter.restart == True and initialNum > 1:
+                self.__restart_seek(an, initialNum)
             else:
-                end_number = initialNum + self.parameter.initial_traj
-                beg_number = initialNum
-            for i in range(beg_number, end_number):
-                if not os.path.exists(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i)):
-                    os.makedirs(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i))
-                if self.parameter.restart == True and os.path.isfile(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i) + '/stop.colvars.state'):
-                    continue
-                launch = True                        
-                self.__traj_from_anchors(an, i)
-                
+                next_script = initialNum
+                for i in range(self.parameter.initial_traj):
+                    submit = False
+                    if i + initialNum == next_script:
+                        next_script = next_script + self.parameter.traj_per_script[0]
+                        submit = True
+                    create_folder(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i + initialNum))
+                    run(self.parameter).prepare_trajectory(a1=an, a2=999, initial='yes', initialNum=i+initialNum, script=submit)
+        #submit jobs
+        for an in range(1,self.parameter.AnchorNum + 1):
+            last_frame = self.__get_next_frame_num(self.parameter.seekPath + '/structure' + str(an))
+            for i in range(last_frame - self.parameter.initial_traj, last_frame):
+                if os.path.exists(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i) + '/submit'):
+                    run(self.parameter).submit(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i) + '/submit')
+                    launch[an - 1] = True
         if self.parameter.restart == False:        
             log("{} trajectories started from each anchor, run for {} ps.".format(self.parameter.initial_traj, self.parameter.initialTime))
-        elif launch == True:
+        elif True in launch:
             log("Remaining trajectories have been launched")
-        elif launch == False:
-            print('No new trajectories launched for this iteration')        
+        else:
+            print('No new trajectories launched for this iteration. Starting next iteration')        
 
-        if launch == True:
+        if True in launch:
             finished = []
             while True:
-                for i in range(1, self.parameter.AnchorNum + 1):
-                    MSname = 'a' + str(i)
-                    if self.parameter.restart == True and launch == False:
-                        finished.append(MSname)
+                for an in range(1, self.parameter.AnchorNum + 1):
+                    MSname = 'a' + str(an)
+                   #if launch[an-1] == False:
+                        #finished.append(MSname)
                     if not run(self.parameter).check(MSname=MSname):
                         continue
                     elif MSname in finished:
@@ -181,7 +172,7 @@ class milestones:
                         finished.append(MSname)
                 if len(finished) == self.parameter.AnchorNum:
                     break
-            time.sleep(60)
+                time.sleep(60)
         
         for i in range(1, self.parameter.AnchorNum + 1):
             curt_frame = self.__get_next_frame_num(self.parameter.seekPath + '/structure' + str(i))
@@ -191,7 +182,8 @@ class milestones:
                     continue
                 if os.path.isfile(path + '/end.txt'):
                     continue
-                timetmp, final_ms =  self.get_final_ms(path)
+                timetmp, final_ms = self.get_final_ms(path)
+                print(final_ms)
                 if final_ms == [0, 0]:
                     continue
                 name = 'MS' + str(final_ms[0]) + '_' + str(final_ms[1])
@@ -209,36 +201,92 @@ class milestones:
                     if self.parameter.namd_conf == True:
                         copy(path + '/' + self.parameter.outputname + '.xst', ms_path + '/sample.xsc')
                     milestones.add(name)
+        for i in range(1,self.parameter.AnchorNum + 1):
+            current_frame = self.__get_next_frame_num(self.parameter.seekPath + '/structure' + str(i))     
+            traj_frame = current_frame - self.parameter.initial_traj
+            self.__restore_scripts(self.parameter.seekPath + '/structure' + str(i), traj_frame)
 
         log("{} milestones have been identified.".format(len(milestones)))  
         self.parameter.restart = False
         return milestones  
 
+    def __restore_scripts(self, path, traj_frame):
+        import os
+        from fileinput import FileInput
+        for i in range(self.parameter.initial_traj):
+            current_path = path + '/' + str(i + traj_frame)
+            if os.path.isfile(current_path + '/submit_done'):
+                os.rename(current_path + '/submit_done', current_path + '/submit')
+            if os.path.isfile(current_path + '/submit'):
+                with FileInput(files=current_path + '/submit', inplace=True) as r:
+                    for line in r:
+                        line = line.strip()
+                        if line.startswith('##') and 'source' not in line:
+                            line = line.replace('##', '')
+                        print(line)
+                        
+                        
     def read_milestone_folder(self):
-        filePath = os.path.dirname(os.path.abspath(__file__)) 
-        pardir = os.path.abspath(os.path.join(filePath, os.pardir)) + '/crd'
         MS_list = set()
         for i in range(1, self.parameter.AnchorNum):
             for j in range(i, self.parameter.AnchorNum + 1):
                 name = str(i) + '_' + str(j)
-                if os.path.exists(pardir + '/' + name):
+                if os.path.exists(self.parameter.crdPath + '/' + name):
                     MS_list.add('MS' + name)
         return MS_list
 
     def read_state(self, path):
         file = open(path, 'r').read()
         time = int(re.findall(r"[-+]?\d*\.\d+|\d+", file)[0])
-#        print(time)
         numbers = re.findall(r"[-+]?\ *[0-9]+\.?[0-9]*(?:[eE]\ *[-+]?\ *[0-9]+)", file)
         numbers.pop(0)
-#        print(numbers)
         numbers = numbers[self.parameter.colvarsNum:]
         rmsd = [abs(float(x)) for x in numbers]
-#        print(rmsd)
-        return rmsd, time
+        return rmsd, time    
     
-                
+    def edit_submit_scripts(self, path, restart_scripts):
+        #1 is done, 0 needs to restart
+        import os
+        from fileinput import FileInput
+
+        for i in range(1, self.parameter.trajPerLaunch + 1):
+            next_line = False
+            run = False
+            current_path = path + '/' + str(i) + '/submit'
+            if os.path.exists(current_path):
+                with FileInput(files=current_path, inplace=True) as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith('##'):
+                            print(line)
+                            continue
+                        if next_line == True:
+                            line = '##' + line
+                            next_line = False
+                        elif 'cd' in line and ('crd' not in line or ('crd' in line and self.parameter.traj_per_script[0] == 1)):
+                            info = line.split('/')
+                            traj_num = int(info[-1]) - 1
+                            if os.path.isfile(path + '/' + str(i) + '/stop.colvars.state'):
+                                line = '##' + line
+                                next_line = True
+                            else:
+                                run = True
+                        print(line)
+                if run == False:
+                    if not os.path.exists(path + '/' + str(i) + '/submit_done'):
+                        os.rename(current_path, path + '/' + str(i) + '/submit_done')
+                        
+                        
 if __name__ == '__main__':
     from parameters import *
+    from run import *
+    from colvar import *
+    
     new = parameters()
-    milestones(new).get_final_ms('/home/weiw/examples/water3/3_4/1/950')
+    new.initialize()
+    jobs = run(new)
+    new.iteration = 1
+    new.traj_per_script = [2,2]
+    new.initial_traj = 6
+    new.milestone_search = 2
+    milestones(new).get_final_ms_grid(new.ScMilesPath)

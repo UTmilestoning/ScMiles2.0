@@ -27,20 +27,58 @@ def listToGraph(MS_list, graph):
         graph[str(anchor2)].add(str(anchor1))
       
     
+def create_seek_log(parameter, visited, key):
+    import os
+    seek_file = parameter.seekPath + '/seek_info.txt'
+    if os.path.isfile(seek_file):
+        os.remove(seek_file)
+    #if not os.path.isfile(seek_file):
+     #   os
+    fconf = open(seek_file, 'a')
+    if key == 'product':
+        print('The product is not in MS_list', file=fconf)
+    elif key == 'reactant':
+        print('The reactant is not in MS_list', file=fconf)
+    else:
+        visited_integers = []
+        not_visited = []
+        for i in visited:
+            visited_integers.append(int(i))
+        visited_integers.sort()
+        for i in range(1, parameter.AnchorNum+1):
+            if i in visited_integers:
+                continue
+            else:
+                not_visited.append(i)
+        #for i in visited:
+         #    print(i, file=fconf)   
+        if not_visited:
+            print('Anchors in network starting at reactant:', file=fconf)
+            print(visited_integers, file=fconf)
+            print('Anchors NOT in network starting at reactant:', file=fconf)
+            print(not_visited, file=fconf)
+        else:
+            print('All anchors are in network', file=fconf)
+    print('\n\n', file=fconf)
+    fconf.close()
+    
 def network_check(parameter, MS_list):
     from log import log
+    
     if len(parameter.reactant) == 2:
         reactant = 'MS' + str(parameter.reactant[0]) + '_' + str(parameter.reactant[1])
         if reactant not in MS_list:
-            log("Reactant and product are NOT connected yet.")  
+            log("Reactant and product are NOT connected yet.")
+            create_seek_log(parameter, None, 'reactant')
             return False
         
     if len(parameter.product) == 2:    
         product = 'MS' + str(parameter.product[0]) + '_' + str(parameter.product[1])
         if product not in MS_list:
-            log("Reactant and product are NOT connected yet.")  
+            log("Reactant and product are NOT connected yet.") 
+            create_seek_log(parameter, None, 'product')
             return False
-  
+    
     first = str(parameter.reactant[0])
     last = str(parameter.product[0])
     graph = {}
@@ -53,7 +91,7 @@ def network_check(parameter, MS_list):
             visited.add(anchor)
             if anchor in graph:
                 queue.extend(graph[anchor] - visited)
-    
+    create_seek_log(parameter, visited, 'network')
 #    print(visited)
     if last in visited:
         log("Reactant and product are connected.")  
