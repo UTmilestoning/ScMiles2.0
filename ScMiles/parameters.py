@@ -28,7 +28,7 @@ class parameters:
                  new_anchor=None, anchor_dist=None, jobsubmit=None, jobcheck=None,
                  anchors=None, atomNumbers=None, error=None, MFPT=None, kij=None, 
                  index=None, flux=None, sing=None, seek_restartfreq=None, max_jobs=None,
-                 colvarNumber=None, pause=None) -> None:
+                 colvarNumber=None, pause=None, dist_cut=None) -> None:
 
         self.iteration = 0    # current iteration number
         self.method = 0       # 0 for classic milestoning; 1 for exact milestoning: iteration
@@ -101,6 +101,7 @@ class parameters:
         self.AnchorPath = os.path.join(self.inputPath, 'anchors.txt') # file path for anchor
         self.restart = False
         self.correctParameters = True
+        self.dist_cut = 0
           
     def initialize(self):
         import os
@@ -146,7 +147,8 @@ class parameters:
                         ('restart', 'restart', 'yes_or_no'),
                         ('seek_restartfreq', 'seek_restartfreq', 'integer'),
                         ('max_jobs', 'max_jobs', 'integer'),
-                        ('split_jobs', 'split_jobs', 'integer'))
+                        ('split_jobs', 'split_jobs', 'integer'),
+                        ('dist_cut','dist_cut','float'))
                               
         with open(file = self.inputPath +'/input.txt') as r:
             for line in r:
