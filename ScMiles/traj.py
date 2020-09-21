@@ -445,7 +445,13 @@ class traj:
                 skip_compute = False
         #if self.parameter.method == 1:
             for item in new_milestones:
-                self.parameter.finished_constain.add(item[0])
+                if item[1] >= self.parameter.new_ms_trajs or self.parameter.iteration <= self.parameter.new_ms_iterations:
+                    if self.paramter.method == 1:
+                        self.parameter.finished_constain.add(item[0])
+                    self.parameter.MS_list.add(item[0])
+                    [anchor1, anchor2] = list(map(int,(re.findall('\d+', item[0]))))
+                    create_folder(self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2))
+                    skip_compute = True
         return count / len(MS_list) + self.parameter.startTraj, skip_compute, new_milestones
     
     def restore_scripts(self, path, traj_frame):
@@ -486,6 +492,7 @@ class traj:
                 if new == True:
                     new_milestones.append([end_ms, 1])
             #checking against user input
+        '''
         if self.parameter.new_ms_trajs != 0 and len(new_milestones) > 0:
             for ms in new_milestones:
                 if ms[1] >= self.parameter.new_ms_trajs:
@@ -497,6 +504,7 @@ class traj:
             skip_compute = True
         if skip_compute == False:
             self.parameter.ignorNewMS = True
+        '''
         return skip_compute, new_milestones
     
     
