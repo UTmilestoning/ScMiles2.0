@@ -28,7 +28,7 @@ class parameters:
                  new_anchor=None, anchor_dist=None, jobsubmit=None, jobcheck=None,
                  anchors=None, atomNumbers=None, error=None, MFPT=None, kij=None, 
                  index=None, flux=None, sing=None, seek_restartfreq=None, max_jobs=None,
-                 colvarNumber=None, pause=None, traj_per_script=None, new_ms_iterations=None, new_ms_trajs=None) -> None:
+                 colvarNumber=None, pause=None, traj_per_script=None, new_ms_iterations=None, new_ms_trajs=None, dist_cut=None) -> None:
 
         self.iteration = 0    # current iteration number
         self.method = 0       # 0 for classic milestoning; 1 for exact milestoning: iteration
@@ -104,6 +104,7 @@ class parameters:
         self.traj_per_script = [1,1] #seek and free
         self.new_ms_iterations = 0
         self.new_ms_trajs = 0
+        self.dist_cut = 0
           
     def initialize(self):
         import os
@@ -152,7 +153,8 @@ class parameters:
                         ('split_jobs', 'split_jobs', 'integer'),
                         ('traj_per_script', 'traj_per_script', 'replace_comma'),
                         ('new_ms_trajs','new_ms_trajs', 'integer'),
-                        ('new_ms_iterations','new_ms_iterations','integer'))
+                        ('new_ms_iterations','new_ms_iterations','integer'),
+                        ('dist_cut','dist_cut','float')
                               
         with open(file = self.inputPath +'/input.txt') as r:
             for line in r:
