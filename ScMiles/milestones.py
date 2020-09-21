@@ -194,6 +194,10 @@ class milestones:
                     continue          
                 elif not os.path.isfile(path + '/' + self.parameter.outputname + '.restart.coor'):
                     continue
+                if self.parameter.dist_cut != 0:
+                    keep_ms = self.__check_distance(name)
+                    if keep_ms == False:
+                        continue
                 else:
                     os.makedirs(ms_path)
                     copy(path + '/' + self.parameter.outputname + '.restart.coor', 
@@ -225,7 +229,26 @@ class milestones:
                             line = line.replace('##', '')
                         print(line)
                         
-                        
+    def ___check_distance(self, milestone):
+        #This only works for Voronoi cell for now.
+        from math import sqrt
+        anchors = []
+        total = 0
+        dist = 0
+        if self.parameter.milestone_search == 1: #Just in case we are adding this to grid as well
+            for i in milestone:
+                anchors.append(self.parameter.anchors[i-1])
+            #calculate distance
+             #this is for each anchor in the milestone
+            total = 0
+            for i in range(len(anchors[0])): #this is for each colvar
+                total += (anchors[0][i] - anchors[1][i])**2
+            dist = sqrt(total)
+            if dist > self.parameter.dist_cut:
+                return False
+            else:
+                return True
+    
     def read_milestone_folder(self):
         MS_list = set()
         for i in range(1, self.parameter.AnchorNum):
