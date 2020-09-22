@@ -154,7 +154,7 @@ class parameters:
                         ('traj_per_script', 'traj_per_script', 'replace_comma'),
                         ('new_ms_trajs','new_ms_trajs', 'integer'),
                         ('new_ms_iterations','new_ms_iterations','integer'),
-                        ('dist_cut','dist_cut','float')
+                        ('dist_cut','dist_cut','float'))
                               
         with open(file = self.inputPath +'/input.txt') as r:
             for line in r:
