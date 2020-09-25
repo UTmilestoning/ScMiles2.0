@@ -195,7 +195,7 @@ class milestones:
                 elif not os.path.isfile(path + '/' + self.parameter.outputname + '.restart.coor'):
                     continue
                 if self.parameter.dist_cut != 0:
-                    keep_ms = self.__check_distance(name)
+                    keep_ms = self.__check_distance(final_ms)
                     if keep_ms == False:
                         continue
                 else:
@@ -229,7 +229,7 @@ class milestones:
                             line = line.replace('##', '')
                         print(line)
                         
-    def ___check_distance(self, milestone):
+    def __check_distance(self, milestone):
         #This only works for Voronoi cell for now.
         from math import sqrt
         anchors = []
