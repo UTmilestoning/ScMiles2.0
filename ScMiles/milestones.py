@@ -45,7 +45,7 @@ class milestones:
                 return next_frame
     
     def initialize(self, status=0):
-        self.parameter.iteration = 0
+        #self.parameter.iteration = 0
         MS_list = set()
         if status == 1:
             MS_list = self.read_milestone_folder()
