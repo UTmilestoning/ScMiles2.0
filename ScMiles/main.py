@@ -70,7 +70,7 @@ while True:
     samples.check_sampling()    # check if the samplings are finished
 
     # next iteration; for iteration methods
-    if parameter.restart == False:
+    if parameter.restart == False or parameter.iteration == 0:
         if parameter.method == 1:
             parameter.iteration += 1 
         else:
