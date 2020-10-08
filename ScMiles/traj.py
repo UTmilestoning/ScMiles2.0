@@ -385,6 +385,15 @@ class traj:
                     create_folder(folderPath)
                     milestones(self.parameter).get_initial_ms(folderPath)
                     self.jobs.prepare_trajectory(a1=anchor1, a2=anchor2, snapshot=j+next_frame, frame=frame, script=submit)
+            
+        for name in self.parameter.MS_list:
+            [anchor1, anchor2] = list(map(int,(re.findall('\d+', name))))
+            MSname = str(anchor1) + '_' + str(anchor2)
+            if self.parameter.method == 1:
+                next_frame = 1
+            else:
+                next_frame = self.__snapshots(name)
+            next_script = next_frame             
             launch = False
             if next_frame == 1:
                 beg_number = 1
