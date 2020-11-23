@@ -5,13 +5,20 @@ Created on Tue Mar 26 15:06:01 2019
 
 @author: Wei Wei
 
-Running sampling.
+sampling class:
+This is a class that is used to generate and submit sampling files, as well as 
+    move sampling files to the /restart folder.
+When initialized, we accept two arguments, parameter and jobs
+    parameter is the instance of our parameter class that has all of the input data stored
+    jobs is an instance of the 'run' class that we will use to run the submit scripts
 
 """
 
 import time
 import re
 import os
+import glob
+from shutil import move
 from colvar import *
 from parameters import *
 from log import *
@@ -24,8 +31,6 @@ class sampling:
     def __init__(self, parameter, jobs):
         self.parameter = parameter
         self.jobs = jobs
-        self.path = os.path.dirname(os.path.abspath(__file__))
-        self.parent_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     def __enter__(self):
         return self
@@ -37,40 +42,81 @@ class sampling:
         return ('Sampling on milestones.')    
 
     def constrain_to_ms(self):
+        '''
+        Description: This generates and our sampling files, and submits the jobs
+        Parameters: None, this class is initialized with parameter and jobs (which is an instance of the run class)
+        Returns: None
+        '''
         import os
         MS_list = self.parameter.MS_list.copy()
         finished = self.parameter.Finished.copy()
         sleep = False
+        script_milestones = []
+        count = 0
         for name in MS_list:
+            count += 1
+            submit = False
             if name in finished or name in self.parameter.finished_constain:
                 continue
-            if not self.jobs.check(MSname=name):
-                continue
+            #if not self.jobs.check(MSname=name):
+            #    continue   
             lst = re.findall('\d+', name)
             anchor1 = int(lst[0])
             anchor2 = int(lst[1])
+            script_milestones.append(str(anchor1) + '_' + str(anchor2))
+            if len(script_milestones) == self.parameter.traj_per_script[1]:
+                submit = script_milestones
+            elif len(MS_list) == count:
+                submit = script_milestones
             restartsPath = self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2) + '/restarts'
+            create_folder(self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2))
             if self.parameter.restart == True:
                 if os.path.isfile(self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2) + '/' + self.parameter.outputname + '.colvars.state'):
                     continue
-            if not os.path.exists(restartsPath):
+            if not os.path.exists(restartsPath) or self.parameter.additional_sampling == True:
                 colvar(self.parameter, anchor1, anchor2).generate()
-                self.jobs.prepare_trajectory(a1=anchor1, a2=anchor2)
-                self.jobs.submit(self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2) + '/MS' + str(anchor1) + '_' + str(anchor2))
+                if self.parameter.additional_sampling == True:
+                    new_sampling = 0
+                    for folder in glob.glob(restartsPath + '/*'):
+                        try:
+                            folder_num = int(folder.split('.')[-2])
+                        except:
+                            continue
+                        if folder_num > new_sampling:
+                            new_sampling = folder_num
+                    self.jobs.prepare_trajectory(anchor1,anchor2,script=submit,new_sampling=new_sampling)
+                else:
+                    self.jobs.prepare_trajectory(anchor1,anchor2,script=submit)
+            if submit is not False:
+                script_milestones = []
+        for name in MS_list:
+            lst = re.findall('\d+', name)
+            anchor1 = int(lst[0])
+            anchor2 = int(lst[1])
+            submit_path = self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2) + '/submit'
+            if os.path.exists(submit_path):
+                self.jobs.submit(submit_path)
+                #move(submit_path, self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2) + '/submit_submitted')
                 sleep = True
         log("{} milestones identified.".format(str(len(MS_list))))             
         if sleep == True:
             log("Sampling on each milestone...")  
             time.sleep(60)
+        #self.parameter.restart = False
 
     def check_sampling(self):
+        '''
+        Description: check the progress of our sampling
+        Parameters: None
+        Returns: self.parameter.Finished, which is a list of all of the milestones that have finished sampling
+        '''
         import re
         from datetime import datetime
         finished = set()
         MS_list = self.parameter.MS_list.copy()
-        while True:
+        while True: #we stay in this this loop until all of our sampling jobs are done running
             for name in self.parameter.MS_list:
-                MSname = name[0:2] + '_' + name[2:]
+                MSname = 'MS'
                 if not self.jobs.check(SampleName=MSname):
                     continue
                 elif name in self.parameter.finished_constain:
@@ -94,28 +140,40 @@ class sampling:
             time.sleep(600)   # 600 seconds
 
     def move_restart(self, names):
-        import os
-        import glob
-        from shutil import move
-        # rootPath = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        '''
+        Description: moves all files with the extension .coor, .vel, or .ext to a folder, restarts and
+            renames our submit file to 'submit_finished' to show that sampling on that script has finished
+        Parameters: names, which is just a copy of our MS_list
+        Returns: None
+        '''
+
         for name in names:
             [anchor1, anchor2] = list(map(int,(re.findall('\d+', name))))
             ms = str(anchor1) + '_' + str(anchor2)
             filePath = self.parameter.crdPath + '/' + ms
             restartFolder = filePath + '/restarts'
-            if not os.path.exists(restartFolder):
-                os.makedirs(restartFolder)
+            create_folder(restartFolder)
+            #failed_sampling = glob.glob(filePath + '/core.*')
+            #if len(failed_sampling) != 0:
+            #    print('A NAMD error possibly occured in the folder {}'.format(filePath))
+            if os.path.exists(filePath + '/submit'):
+                move(filePath + '/submit',filePath + '/submit_finished')
             for ext in ["coor", "vel", "xsc"]:
                 for file in glob.glob(filePath + '/*.' + ext):
-                    move(file, restartFolder)
-                
+                    try:
+                        move(file, restartFolder)
+                    except:
+                        continue             
             
 if __name__ == '__main__':
     from parameters import *
     from run import *
     new = parameters()
     new.initialize()
-    jobs = run(new, 1, 2)
+    new.restart = False
+    new.MS_list = milestones(new).read_milestone_folder()
+    jobs = run(new)
     test = sampling(new, jobs)
+    test.constrain_to_ms()
 #    print(new.anchors)
 #    test.generate()

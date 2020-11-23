@@ -19,6 +19,7 @@ from milestones import *
 from analysis import analysis_kernel
 from traj import *
 from restart import *
+from run import *
 
 # run free trajectories without sampling
 import argparse
@@ -41,7 +42,9 @@ samples = sampling(parameter, jobs)
 lastLog = ""
 
 # initialize with reading anchor info and identifying milestones 
-if parameter.restart == False:
+if len(parameter.MS_list) != 0:
+    pass
+elif parameter.restart == False:
     parameter.MS_list = milestones(parameter).initialize(status=status)
 else:
     seek, sample, lastLog = read_log(parameter, status)
@@ -56,10 +59,12 @@ else:
         log('ScMiles restarted. Continuing free trajectories step.')
         parameter.MS_list = milestones(parameter).read_milestone_folder()
                 
+if parameter.milestone_search == 3:
+    parameter.milestone_search = 2 #everything after this point is the same for both and I already used 2 for everything so I am changing it to 2 here
 if "Preparing for more free trajectories" in lastLog:
     parameter.restart = False
     lastLog = None
-
+    
 while True:
     free_trajs = traj(parameter, jobs)
     
@@ -70,14 +75,14 @@ while True:
     samples.check_sampling()    # check if the samplings are finished
 
     # next iteration; for iteration methods
-    if parameter.restart == False or parameter.iteration == 0:
+    if parameter.restart == False:
         if parameter.method == 1:
             parameter.iteration += 1 
         else:
             parameter.iteration = 1 
         
     skip_step = False
-    skip_logs = ['Computing...', 'Mean first passage time', 'Preparing for more free trajectories']
+    skip_logs = ['Computing...', 'Mean first passage time', 'Preparing for more free trajectories', 'Finished writing files end.txt and lifetime.txt']
     if parameter.restart == True and lastLog:
         for item in skip_logs:
             if item in lastLog:
@@ -85,7 +90,10 @@ while True:
     # lauch free runs from the samples
     if skip_step == False:
         current_snapshot, skip_compute, new_milestones = free_trajs.launch(lastLog = lastLog)
-        
+        log('Finished writing files end.txt and lifetime.txt')
+
+    if parameter.customMS_list:
+        parameter.MS_list = milestones(parameter).read_milestone_folder()
     skip_step = False
     # compute kernel, flux, probability, life time of each milstone, and MFPT as well
     skip_logs = ['Mean first passage time', 'Preparing for more free trajectories']
@@ -94,11 +102,15 @@ while True:
             if item in lastLog:
                 skip_step = True
     if skip_step == False:
+        if parameter.ignorNewMS == True:
+            skip_compute = False
         analysis_kernel(parameter, skip_compute)
     
     parameter.restart = False
+    if parameter.customMS_list:
+        parameter.MS_list = parameter.customMS_list.copy()
     lastLog = None
-    
+    #break
     # If any NEW milestone has been reached
     if len(parameter.MS_new) != 0 and not parameter.ignorNewMS:
         log("Reached {} new milestone(s).".format(len(parameter.MS_new)))
@@ -116,13 +128,13 @@ while True:
     if parameter.method == 0 and current_snapshot >= parameter.nframe:
         log("All the snapshots have been used...")
         break
-
-    if skip_compute == False:
-        parameter.finished_constain = parameter.MS_list.copy()    
+    print("MFPT IS")
+    print(parameter.MFPT)
     # break if reach max iteration
     if parameter.iteration >= parameter.maxIteration:
         log("Reached max iteration...")
         break
+    
     elif skip_compute == True:
         log('Preparing for more free trajectories...')
         MFPT_temp = 1
@@ -131,7 +143,7 @@ while True:
         for item in new_milestones:
             parameter.MS_list.add(item[0])
     # if no results
-
+    
     elif np.isnan(parameter.MFPT) or parameter.MFPT < 0:
         log("Preparing for more free trajectories...")
         MFPT_temp = 1

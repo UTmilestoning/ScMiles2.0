@@ -279,8 +279,8 @@ def compute(parameter):
     with open(path + '/committor.txt', 'w+') as f1:
         print('\n'.join([''.join(['{:>15}'.format(str(item)) for item in m])]),file=f1)
         print('\n'.join([''.join(['{:15.8f}'.format(item) for item in np.squeeze(c)])]),file=f1)
-        
-#    get_start_end_lifetime(parameter)  
+    if parameter.data_file == True:    
+        get_start_end_lifetime(parameter)  
     
     if not parameter.sing:
         parameter.MFPT = tau1
@@ -345,7 +345,7 @@ def get_start_end_lifetime(parameter):
             f1.write(" ".join(map(str,item)) + '\n')
     if parameter.iteration == 1:
         with open(parameter.currentPath + '/all_data.txt', 'w') as f1:
-            f1.write('Iteration start[0] start[1] end[0] end[1] Lifetime Enhancement Filepath')
+            f1.write('Iteration start[0] start[1] end[0] end[1] Lifetime Enhancement Path')
             for item in data:
                 f1.write(" ".join(map(str,item)) + '\n')
     else:

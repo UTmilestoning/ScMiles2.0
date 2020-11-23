@@ -28,7 +28,9 @@ class parameters:
                  new_anchor=None, anchor_dist=None, jobsubmit=None, jobcheck=None,
                  anchors=None, atomNumbers=None, error=None, MFPT=None, kij=None, 
                  index=None, flux=None, sing=None, seek_restartfreq=None, max_jobs=None,
-                 colvarNumber=None, pause=None, traj_per_script=None, new_ms_iterations=None, new_ms_trajs=None, dist_cut=None) -> None:
+                 colvarNumber=None, deltas=None, pause=None, traj_per_script=None, 
+                 new_ms_iterations=None, new_ms_trajs=None, dist_cut=None, not_finish_trajs=None,
+                 data_file=False, customMS_list = False) -> None:
 
         self.iteration = 0    # current iteration number
         self.method = 0       # 0 for classic milestoning; 1 for exact milestoning: iteration
@@ -104,9 +106,17 @@ class parameters:
         self.traj_per_script = [1,1] #seek and free
         self.new_ms_iterations = 0
         self.new_ms_trajs = 0
+        self.deltas = None
         self.dist_cut = 0
-          
+        self.not_finish_trajs = None
+        self.additional_sampling = False
+        self.data_file = False
+        self.customMS_list = None
+
     def initialize(self):
+        '''
+        In this function, we read in all of the user input from input.txt (as well as a few things from free.namd
+        '''
         import os
         import pandas as pd
         import re
@@ -154,7 +164,10 @@ class parameters:
                         ('traj_per_script', 'traj_per_script', 'replace_comma'),
                         ('new_ms_trajs','new_ms_trajs', 'integer'),
                         ('new_ms_iterations','new_ms_iterations','integer'),
-                        ('dist_cut','dist_cut','float'))
+                        ('deltas','deltas','replace_comma'),
+                        ('MS_list','MS_list','replace_comma'),
+                        ('additional_sampling','additional_sampling', 'yes_or_no'),
+                        ('data_file','data_file','yes_or_no'))
                               
         with open(file = self.inputPath +'/input.txt') as r:
             for line in r:
@@ -176,7 +189,19 @@ class parameters:
                         elif item[2] == 'replace_comma':
                             rm = line.replace(","," ").replace("  "," ").split(" ")
                             rm.pop(0)
-                            setattr(self, item[1], list(map(int, rm)))
+                            if item[0] == 'deltas':
+                                for i in range(len(rm)):
+                                    rm[i] == float(rm[i])
+                                setattr(self, item[1], rm)
+                            try:
+                                setattr(self, item[1], list(map(int, rm)))
+                            except:
+                                MS_list = set()
+                                for i in rm:
+                                    MS_list.add(i)
+                                self.ignorNewMS = True
+                                self.customMS_list = MS_list
+                                setattr(self, item[1], MS_list) 
                         elif item[2] == 'string':
                             setattr(self, item[1], str(info[1]))
             
@@ -191,22 +216,6 @@ class parameters:
                         continue
                     line = line.split("\n")
                     self.nodes.append(str(line[0]))
-                    
-        if os.path.exists(self.crdPath) and self.restart == False:
-            print('You have a directory called "crd" and have designated that restart = False.')
-            print('Please enter the number next to the option you would like to choose')
-            print('1. I would like to quit the simulation and move/delete my crd files')
-            print('2. I would like to turn restart on and continue the simulation where I left off \n')
-            user_input = input()
-            while True:
-                if user_input == '1':
-                    self.correctParameters = False
-                    return
-                elif user_input == '2':
-                    self.restart = True
-                    break
-                else:
-                    user_input = input('Invalid input. Please choose an option \n\n')
                             
         self.anchors = pd.read_table(self.AnchorPath, delimiter='\s+', header=None).values
         '''
@@ -245,7 +254,12 @@ class parameters:
         if self.restart == False:
             if os.path.exists(os.path.join(self.currentPath, 'log')):
                 os.remove(os.path.join(self.currentPath, 'log'))           
-            log(f"Initialized with {self.AnchorNum} anchors.")
+            log("Initialized with {} anchors.".format(self.AnchorNum))
+            
+    def ms_to_path(ms):
+        import re
+        [anchor1, anchor2] = list(map(int, (re.findall('\d+', ms))))
+        return self.crdPath + '/' + str(anchor1) + '_' + str(anchor2)
                         
 if __name__ == '__main__':
     new = parameters()

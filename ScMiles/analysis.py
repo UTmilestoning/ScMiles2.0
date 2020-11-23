@@ -22,7 +22,7 @@ def analysis_kernel(parameter, skip_compute):
         parameter.MS_new = (parameter.MS_new | new) - known
     if parameter.sing:
         parameter.Finished = set()
-    parameter.milestone_search = 0
+    #parameter.milestone_search = 0
         
 if __name__ == '__main__':
     new = parameters()

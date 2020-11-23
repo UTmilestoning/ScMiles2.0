@@ -231,8 +231,6 @@ def milestoning(parameter, skip_compute):
     else:
         log("Computing skipped this iteration")
     backup(parameter, files)
-    from compute import get_start_end_lifetime
-    get_start_end_lifetime(parameter)
     return ms, ms.new, ms.known
 
 

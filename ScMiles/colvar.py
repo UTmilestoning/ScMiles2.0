@@ -114,6 +114,9 @@ class colvar:
             if self.variables[i-1] == '':
                 log("Colvar Error. Please name your colvars")
 
+        
+        
+        
     def __rmsd_to_anchor(self, anchor, coeff=None, space=0):
         '''Used in "free" case, replaces "anchor" with the corresponding number in anchors.txt'''
         # scriptPath = os.path.dirname(os.path.abspath(__file__))
@@ -151,36 +154,6 @@ class colvar:
             print("  " * space + "  " + line, file=fconf)
         fconf.close()
         
-#    def __rmsd_to_anchor(self, anchor, coeff=None, space=0):
-#        '''
-#        Change this function for different 1D case.
-#        Follow the format in Colvars to define the distance measurement.
-#        For the commands below, it generates the following.
-#        
-#        colvar {
-#          name rmsd1
-#          customFunction abs(psi - (-165.0))
-#          dihedral {
-#            name psi
-#            group1 atomNumbers 7
-#            group2 atomNumbers 9
-#            group3 atomNumbers 15
-#            group4 atomNumbers 17
-#          }
-#        }
-#          
-#        '''
-#        fconf = open(self.config_path, 'a')
-#        name = "rmsd" + str(anchor)
-#        print("\n" + "  " * space + "colvar {", file=fconf)
-#        print("  " * space + "  name {:5}".format(name), file=fconf)
-#        func = "abs(psi - (" + str(self.parameter.anchors[anchor-1][0]) + "))"
-#        print("  " * space + "  customFunction {}".format(func), file=fconf)
-#        fconf.close()
-#        self.__collective_vari_1()
-#        fconf = open(self.config_path, 'a')
-#        print("  " * space + "}", file=fconf)
-#        fconf.close()
 
     def generate(self):    
         '''This is the main function that generates colvars '''
@@ -203,20 +176,63 @@ class colvar:
         fconf.close()
         
         if self.free == 'yes':
-            for i in range(self.parameter.AnchorNum):
-                self.__rmsd_to_anchor(i+1)       
+            if self.parameter.milestone_search == 2:
+                if self.initial == 'yes':
+                    self.__grid_seek()
+                else:
+                    self.__grid_colvars()
+            else:
+                for i in range(self.parameter.AnchorNum):
+                    self.__rmsd_to_anchor(i+1)       
         else:
             self.__get_colvar_names()
             if self.colvars_number == 1:
                 self.__constraint1D1()
                 self.__harmonic1D()
+            elif self.parameter.milestone_search == 2:
+                self.__grid_sampling()
             else:
                 self.__constraint2D1()
                 colvarList, centers = self.__constraint2D2()
                 self.__harmonic2D()
                 self.__harmonicWalls(colvarList, centers)
 
-
+    def __grid_seek(self):
+        equations = []
+        values = []
+        count = 0
+        colvar_list, names = self.__get_colvars()
+        anchor_coordinates = self.parameter.anchors[self.anchor1 - 1]
+        for i in range(len(anchor_coordinates)):
+            values.append([anchor_coordinates[i] - self.parameter.deltas[i]/2, anchor_coordinates[i] + self.parameter.deltas[i]/2])
+        for i in values:
+            i.sort()
+        for i in range(len(values)):
+            equations.append(self.__create_step(values[i][0], names[i]))
+            for k in range(len(values)):
+                if  k == i:
+                    continue
+                equations.append(self.__create_step(values[k][1], names[k], names[k], values[k][0]))
+            equations.append(self.__create_step(names[i], values[i][1]))
+            for k in range(len(values)):
+                if  k == i:
+                    continue
+                equations.append(self.__create_step(values[k][1], names[k], names[k], values[k][0]))
+                
+        fconf = open(self.config_path, 'a')
+        for eq in equations:
+            count += 1
+            eq = eq.replace('- -', '+ ')
+            eq = eq.replace('--', '+')
+            print('colvar {', file = fconf)
+            print('  name ' + str(count), file = fconf)
+            print('  customFunction ' + eq, file=fconf)
+            for i in range(len(names)):
+                if names[i] in eq:
+                    for line in colvar_list[i]:
+                        print("    " + line, file=fconf)
+            print("}", file=fconf)   
+        fconf.close()
 
     def __constraint1D1(self):
         fconf = open(self.config_path, 'a')
@@ -307,11 +323,12 @@ class colvar:
                 fconf.close()
         return colvarList, centers
     
-    def __harmonic2D(self):
+    def __harmonic2D(self, center=None):
         fconf = open(self.config_path, 'a')
         print("harmonic {", file=fconf)
         print("  colvars neighbor", file=fconf)
-        center = 0
+        if not center:
+            center = 0
         print("  centers {}".format(str(center)), file=fconf)
         print("  forceConstant {}".format(self.parameter.forceConst), file=fconf)
         print("}", file=fconf)
@@ -327,12 +344,182 @@ class colvar:
         print("}", file=fconf)
         fconf.close()
 
+    def __grid_colvars(self):
+        anchor1_coors = self.parameter.anchors[self.anchor1-1]
+        anchor2_coors = self.parameter.anchors[self.anchor2-1]
+         
+        colvar_list, names = self.__get_colvars()
+        count = 0
+        #IF WE HAVE 3 anchors
+        
+        deltas = []
+        length = []
+        length_names = []
 
+         #finding our delta values 
+        '''
+        for j in range(len(names)):
+            values = []
+            for i in range(len(self.parameter.anchors)):
+                if self.parameter.anchors[i][j] not in values:
+                    values.append(self.parameter.anchors[i][j])
+            values.sort()
+            deltas.append(abs(values[0] - values[1]))
+        '''
+        deltas = self.parameter.deltas.copy()
+                
+        for i in range(len(names)):
+            if anchor1_coors[i] != anchor2_coors[i]:
+                value = (anchor1_coors[i] + anchor2_coors[i])/2
+                neighbor = [value - deltas[i], value, value + deltas[i]]
+                neighbor.sort()
+                neighbor_name = names[i]
+            else:
+                length_values = [anchor1_coors[i], anchor1_coors[i] + deltas[i]/2, anchor1_coors[i] - deltas[i]/2]
+                length_values.sort()
+                length.append(length_values)
+                length_names.append(names[i])
+                
+        equations = []
+        #greater than, name first -- less than, name last
+        #always parallel first
+        equations.append(self.__create_step(neighbor_name, neighbor[2])) #parallel max
+        for i in range(len(length)):
+            equations.append(self.__create_step(length[i][2], length_names[i], length_names[i], length[i][0]))
+        equations.append(self.__create_step(neighbor[0], neighbor_name))
+        for i in range(len(length)):
+            equations.append(self.__create_step(length[i][2], length_names[i], length_names[i], length[i][0]))
+        for i in range(len(length)):
+            equations.append(self.__create_step(length_names[i], length[i][2])) #max length (right upper)
+            equations.append(self.__create_step(neighbor_name, neighbor[1], neighbor[2], neighbor_name))
+            for k in range(len(length)):
+                if i != k:
+                    equations.append(self.__create_step(length_names[k], length[k][0], length[k][2], length_names[k]))
+                
+            equations.append(self.__create_step(length_names[i], length[i][2])) #right lower
+            equations.append(self.__create_step(neighbor[1], neighbor_name, neighbor_name, neighbor[0]))            
+            for k in range(len(length)):
+                if i != k:
+                    equations.append(self.__create_step(length_names[k], length[k][0], length[k][2], length_names[k]))
+            
+            equations.append(self.__create_step(length[i][0], length_names[i]))#min length (left upper)
+            equations.append(self.__create_step(neighbor_name, neighbor[1], neighbor[2], neighbor_name))
+            for k in range(len(length)):
+                if i != k:
+                    equations.append(self.__create_step(length_names[k], length[k][0], length[k][2], length_names[k]))
+                
+            equations.append(self.__create_step(length[i][0], length_names[i])) #left lower
+            equations.append(self.__create_step(neighbor[1], neighbor_name, neighbor_name, neighbor[0]))
+            for k in range(len(length)):
+                if i != k:
+                    equations.append(self.__create_step(length_names[k], length[k][0], length[k][2], length_names[k]))
+
+        fconf = open(self.config_path, 'a')
+        for eq in equations:
+            count += 1
+            eq = eq.replace('- -', '+ ')
+            eq = eq.replace('--', '+')
+            print('colvar {', file = fconf)
+            print('  name ' + str(count), file = fconf)
+            print('  customFunction ' + eq, file=fconf)
+            for i in range(len(names)):
+                if names[i] in eq:
+                    for line in colvar_list[i]:
+                        print("    " + line, file=fconf)
+            print("}", file=fconf)   
+        fconf.close()
+            
+    def __create_step(self, value1, value2, value3=None, value4=None):
+        if value3 == None:
+            return 'step(' + str(value1) + '-' + str(value2) + ')'
+        else:
+            return 'step(' + str(value1) + '-' + str(value2) + ')' + ' + ' + 'step(' + str(value3) + '-' + str(value4) + ')'
+        
+
+            
+        
+        
+    def __grid_sampling(self):
+        '''
+        [anchor1, anchor2] = list(map(int, (re.findall('\d+', milestone))))
+        anchor1_coor = self.parameters.anchors[anchor1-1]
+        anchor2_coor = self.parameters.anchors[anchor2-1]
+        '''
+        anchor1_coor = self.parameter.anchors[self.anchor1-1]
+        anchor2_coor = self.parameter.anchors[self.anchor2-1]
+        
+        colvars, names = self.__get_colvars()
+        for i in range(len(anchor1_coor)):
+            if anchor1_coor[i] != anchor2_coor[i]:
+                neighbor = i
+        delta_value = self.parameter.deltas.copy() #change this later, or have user input value
+        center = (anchor1_coor[neighbor] + anchor2_coor[neighbor])/2
+        fconf = open(self.config_path, 'a')
+        print("\ncolvar {", file=fconf)
+        print("  name neighbor", file=fconf)
+        for item in colvars[neighbor]:
+            print("   {}".format(item), file=fconf)
+        print("  }", file=fconf)
+        count = 0
+        for i in range(len(names)):
+            if i == neighbor:
+                continue
+            count += 1
+            print("\ncolvar {", file=fconf)
+            print("  name length{}".format(count), file=fconf)
+            for item in colvars[i]:
+                print("   {}".format(item), file=fconf)
+            print("  }", file=fconf)
+        fconf.close()
+        count = 0
+        self.__harmonic2D(center)
+        fconf = open(self.config_path, 'a')    
+        for i in range(len(names)):
+            if i == neighbor:
+                continue
+            count += 1
+            walls = [anchor1_coor[i] + delta_value[i]/2, anchor1_coor[i] - delta_value[i]/2]
+            walls.sort()
+            print("\n", file=fconf)
+            print("harmonicWalls {", file=fconf)
+            print("  colvars length{}".format(count), file=fconf)
+            print("  lowerWalls {}".format(walls[0]), file=fconf)
+            print("  upperWalls {}".format(walls[1]), file=fconf)        
+            print("  lowerWallConstant {}".format(self.parameter.forceConst), file=fconf)
+            print("  UpperWallConstant {}".format(self.parameter.forceConst), file=fconf)
+            print("} \n", file=fconf)
+            
+        fconf.close()  
+        
+        
+    def __get_colvars(self):
+        count = 0
+        tmp = []
+        colvar_list = []
+        names = []
+        with open(file = self.parameter.inputPath + '/colvar.txt') as f:
+            for line in f:
+                if line == '' or line == '\n':
+                    continue
+                tmp.append(line)
+                if 'name' in line:
+                    names.append(line.split()[1])
+                if '{' in line:
+                    count += 1
+                if '}' in line:
+                    count -= 1
+                if count == 0:
+                    colvar_list.append(tmp)
+                    tmp = []
+        return colvar_list, names
+    
+    
 if __name__ == '__main__':
     from parameters import *
     new = parameters()
     new.initialize()
-    print(new.anchors)
-    colvar(new, anchor1=1, anchor2=2).generate()
-    colvar(new, anchor1=1, anchor2=2, free='yes').generate()
+    new.milestone_search = 2
+    new.deltas = [30,30,30]
+    #colvar(new, anchor1=1, anchor2=2).generate()
+    colvar(new, anchor1=19, anchor2=20).generate()
     

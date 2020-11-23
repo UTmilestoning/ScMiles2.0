@@ -1,0 +1,47 @@
+set anchor1 a111
+set anchor2 a222
+
+proc calc_colvar_forces { ts } {
+global anchor1 anchor2
+
+set list [cv list]
+set list [lreplace $list 0 1]
+#print $list
+
+set valTotal 5
+set valA 0
+set valB 0
+
+foreach colv $list {
+set col [expr abs([cv colvar $colv value])]
+if {($col == 0)} {
+  set valA 0
+  set valB 0
+} elseif {($col == 1)} {
+  set valA 1
+  set valB 0
+} elseif {($col == 2) && ($valA == 1)} {
+set valB [expr {$valB + 2}]
+} else {
+set valA 0
+set valB 0
+}
+set total [ expr {$valA + $valB}]
+if {$total == $valTotal} {
+break
+}
+}
+
+if {$total == $valTotal} {
+print $ts $valA $valB
+cv printframe
+cv save stop
+print "hit new milestone"
+#### pick exit command depands on the cluster ###
+exit
+#################################################
+#set process [pid]
+#exec kill -9 $process
+#################################################
+}
+}
