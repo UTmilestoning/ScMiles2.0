@@ -1,0 +1,16 @@
+dihedral {
+  name phi
+  group1 atomNumbers 5
+  group2 atomNumbers 7
+  group3 atomNumbers 9
+  group4 atomNumbers 15
+}
+
+dihedral {
+  name psi
+  group1 atomNumbers 7
+  group2 atomNumbers 9
+  group3 atomNumbers 15
+  group4 atomNumbers 17
+}
+
