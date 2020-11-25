@@ -1,0 +1,24 @@
+CRYST1    0.000    0.000    0.000  90.00  90.00  90.00 P 1           1
+HETATM    1  CL  ALADP   1       2.346   3.802   4.413  0.00  0.00      P1   C
+HETATM    2  HL1 ALADP   1       1.494   4.384   4.826  0.00  0.00      P1   H
+HETATM    3  HL2 ALADP   1       2.690   4.609   3.731  0.00  0.00      P1   H
+HETATM    4  HL3 ALADP   1       3.133   3.621   5.176  0.00  0.00      P1   H
+HETATM    5  CLP ALADP   1       2.045   2.680   3.458  0.00  0.00      P1   C
+HETATM    6  OL  ALADP   1       2.707   1.669   3.472  0.00  0.00      P1   O
+HETATM    7  NL  ALADP   1       1.020   2.795   2.761  0.00  0.00      P1   N
+HETATM    8  HL  ALADP   1       0.338   3.517   2.850  0.00  0.00      P1   H
+HETATM    9  CA  ALADP   1       0.771   1.884   1.638  0.00  0.00      P1   C
+HETATM   10  HA  ALADP   1       1.631   1.627   1.038  0.00  0.00      P1   H
+HETATM   11  CB  ALADP   1      -0.069   0.651   2.082  0.00  0.00      P1   C
+HETATM   12  HB1 ALADP   1      -1.000   1.064   2.527  0.00  0.00      P1   H
+HETATM   13  HB2 ALADP   1      -0.324   0.127   1.136  0.00  0.00      P1   H
+HETATM   14  HB3 ALADP   1       0.560   0.014   2.740  0.00  0.00      P1   H
+HETATM   15  CRP ALADP   1      -0.005   2.777   0.678  0.00  0.00      P1   C
+HETATM   16  OR  ALADP   1      -1.014   3.279   1.099  0.00  0.00      P1   O
+HETATM   17  NR  ALADP   1       0.554   2.984  -0.525  0.00  0.00      P1   N
+HETATM   18  HR  ALADP   1       1.540   2.846  -0.575  0.00  0.00      P1   H
+HETATM   19  CR  ALADP   1      -0.265   3.611  -1.441  0.00  0.00      P1   C
+HETATM   20  HR1 ALADP   1       0.115   4.630  -1.670  0.00  0.00      P1   H
+HETATM   21  HR2 ALADP   1      -1.346   3.853  -1.356  0.00  0.00      P1   H
+HETATM   22  HR3 ALADP   1      -0.317   3.176  -2.462  0.00  0.00      P1   H
+END

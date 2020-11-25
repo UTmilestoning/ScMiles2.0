@@ -1,0 +1,24 @@
+CRYST1    0.000    0.000    0.000  90.00  90.00  90.00 P 1           1
+ATOM      1  CL  ALADP   1       1.832   4.001   4.298  0.00  0.00      P1   C
+ATOM      2  HL1 ALADP   1       1.361   3.278   4.997  0.00  0.00      P1   H
+ATOM      3  HL2 ALADP   1       1.393   5.020   4.242  0.00  0.00      P1   H
+ATOM      4  HL3 ALADP   1       2.850   4.174   4.708  0.00  0.00      P1   H
+ATOM      5  CLP ALADP   1       1.747   3.461   2.988  0.00  0.00      P1   C
+ATOM      6  OL  ALADP   1       2.238   4.166   2.050  0.00  0.00      P1   O
+ATOM      7  NL  ALADP   1       1.227   2.213   2.844  0.00  0.00      P1   N
+ATOM      8  HL  ALADP   1       1.018   1.661   3.648  0.00  0.00      P1   H
+ATOM      9  CA  ALADP   1       1.107   1.503   1.527  0.00  0.00      P1   C
+ATOM     10  HA  ALADP   1       2.124   1.285   1.233  0.00  0.00      P1   H
+ATOM     11  CB  ALADP   1       0.078   0.341   1.725  0.00  0.00      P1   C
+ATOM     12  HB1 ALADP   1       0.340  -0.162   2.680  0.00  0.00      P1   H
+ATOM     13  HB2 ALADP   1      -0.983   0.645   1.863  0.00  0.00      P1   H
+ATOM     14  HB3 ALADP   1       0.139  -0.144   0.728  0.00  0.00      P1   H
+ATOM     15  CRP ALADP   1       0.727   2.207   0.179  0.00  0.00      P1   C
+ATOM     16  OR  ALADP   1       1.254   1.878  -0.946  0.00  0.00      P1   O
+ATOM     17  NR  ALADP   1       0.044   3.376   0.257  0.00  0.00      P1   N
+ATOM     18  HR  ALADP   1      -0.292   3.873   1.052  0.00  0.00      P1   H
+ATOM     19  CR  ALADP   1      -0.363   4.033  -0.904  0.00  0.00      P1   C
+ATOM     20  HR1 ALADP   1      -0.872   4.970  -0.594  0.00  0.00      P1   H
+ATOM     21  HR2 ALADP   1      -0.903   3.353  -1.599  0.00  0.00      P1   H
+ATOM     22  HR3 ALADP   1       0.540   4.470  -1.379  0.00  0.00      P1   H
+END
