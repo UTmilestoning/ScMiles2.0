@@ -364,7 +364,7 @@ class milestones:
                 # use the second min value for previous cell #
                 final_ms[1] = RMSDs.index(sorted(RMSDs)[1]) + 1 
             
-            if self.parameter.iteration >= 1:
+            if 'seek' not in path:
                 try:
                     start_ms = pd.read_csv(path + '/start.txt', header=None, delimiter=r'\s+').values.tolist()[0]
                 except:
