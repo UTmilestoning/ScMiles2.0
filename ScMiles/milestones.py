@@ -472,7 +472,7 @@ class milestones:
                 elif not os.path.isfile(path + '/' + self.parameter.outputname + '.restart.coor'):
                     continue
                 if self.parameter.dist_cut != 0:
-                    keep_ms = self.__check_distance(name)
+                    keep_ms = self.__check_distance(final_ms)
                     if keep_ms == False:
                         continue
                 os.makedirs(ms_path)
