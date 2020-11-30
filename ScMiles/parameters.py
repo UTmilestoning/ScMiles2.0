@@ -167,7 +167,8 @@ class parameters:
                         ('deltas','deltas','replace_comma'),
                         ('MS_list','MS_list','replace_comma'),
                         ('additional_sampling','additional_sampling', 'yes_or_no'),
-                        ('data_file','data_file','yes_or_no'))
+                        ('data_file','data_file','yes_or_no'),
+                        ('dist_cut','dist_cut','float'))
                               
         with open(file = self.inputPath +'/input.txt') as r:
             for line in r:
