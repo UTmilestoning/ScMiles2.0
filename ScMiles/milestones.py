@@ -401,7 +401,7 @@ class milestones:
         for an in range(1, self.parameter.AnchorNum + 1):
             initialNum = self.__get_next_frame_num(self.parameter.seekPath + '/structure' + str(an))
             if self.parameter.restart == True and initialNum > 1:
-                self.edit_submit_scripts(self.parameter.seekPath + '/structure' + str(an),None)
+                self.edit_submit_scripts(self.parameter.seekPath + '/structure' + str(an),None,initialNum)
             else:
                 next_script = initialNum
                 for i in range(self.parameter.initial_traj):
@@ -555,12 +555,12 @@ class milestones:
         values = [abs(float(x)) for x in numbers]
         return values, time    
     
-    def edit_submit_scripts(self, path, restart_scripts):
+    def edit_submit_scripts(self, path, restart_scripts,frame_number):
         #1 is done, 0 needs to restart
         import os
         from fileinput import FileInput
 
-        for i in range(1, self.parameter.initial_traj + 1):
+        for i in range(1, frame_number + 1):
             next_line = False
             run = False
             current_path = path + '/' + str(i) + '/submit'
