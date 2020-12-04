@@ -82,7 +82,7 @@ def committor(parameter, k):
     A = np.ones((len(c),1))
     return np.matmul(c,A)
 
-
+    
 def flux(k):
     '''flux calculation'''
     kk = k.copy()
@@ -182,12 +182,58 @@ def MFPT2(parameter, k, t):
         tau = p0 * np.linalg.inv(I - np.mat(k2)) * np.transpose(np.mat(t))
     return float(tau)
 
+def exit_time(parameter,k,t,committor):
+    dim = len(k)
+    I = np.identity(dim)
+    k2 = k.copy()
+    for i in parameter.product_milestone:
+        if i == -1:
+            return -1
+        k2[i] = [0 for i in k2[i]]
+        t[i] = 0
+    for i in parameter.reactant_milestone:
+        if i == -1:
+            return -1
+        k2[i] = [0 for i in k2[i]]
+        t[i] = 0
+    if np.linalg.det(np.mat(I) - np.mat(k2)) == 0.0:
+        parameter.sing = True
+        return -1
+    else:
+        parameter.sing = False
+        #exit time
+        t_matrix = I * t
+        tau = np.linalg.inv(I - np.mat(k2)) * np.transpose(np.mat(t))
+        #directional_exit
+        inverse_matrix = np.linalg.inv(I-np.mat(k2))
+        inverse_and_t_term = np.matmul(inverse_matrix,t_matrix)
+        inverse_and_t_term = np.matmul(inverse_and_t_term,inverse_matrix)
+        e_vector_product = np.zeros(len(t))
+        e_vector_product[parameter.product_milestone] = 1
+        e_vector_product = np.transpose(np.array([e_vector_product]))
+        calculation = np.matmul(inverse_and_t_term,e_vector_product)
+        directional_exit = []
+        committor = np.ndarray.tolist(committor)
+        for i in range(len(t)):
+            e_vector_i = np.zeros(len(t))
+            e_vector_i[i] = 1
+            e_vector_i = np.array([e_vector_i])
+            dir_exit_time = np.matmul(e_vector_i,calculation)
+            dir_exit_time = np.matrix.item(dir_exit_time)
+            try:
+                dir_exit_time = dir_exit_time/committor[i][0]
+            except ZeroDivisionError:
+                dir_exit_time = 'undefined'
+            directional_exit.append(dir_exit_time)
+    tau_list = []
+    for i in range(len(tau)):
+        tau_list.append(float(tau[i][0]))
+    #print(tau_list)
+    return tau_list, directional_exit
 
 def compute(parameter):
     from math import sqrt
-    filePath = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.abspath(os.path.join(filePath, os.pardir)) + '/my_project_output'
-    path = path + '/current'
+    path = parameter.currentPath
     filepath_t = path + '/life_time.txt'
     t_raw = pd.read_fwf(filepath_t, header=1).values
     t = (t_raw[0, :]).tolist()
@@ -196,7 +242,20 @@ def compute(parameter):
     kc_raw = pd.read_fwf(path + '/k.txt', header=1).values
     kc = [[float(j) for j in i] for i in kc_raw[0:dimension,0:dimension].tolist()]
     k = k_average(np.array(kc))
-
+    t_matrix = []
+    count = 0
+    with open(path + '/t.txt') as f:
+        for line in f:
+            count += 1
+            if count <= 2:
+                continue
+            info = line.split()
+            for i in range(len(info)):
+                info[i] = float(info[i])
+            t_matrix.append(info)
+    #print(t_matrix)
+    t_matrix = np.array(t_matrix)
+    #print(t_matrix)
     ms_list = np.load(path + '/ms_index.npy', allow_pickle=True).item()
     
     kk = k.copy()
@@ -219,6 +278,8 @@ def compute(parameter):
     energy = free_energy(p)
     tau1 = MFPT(parameter, kk, tt)
     tau2 = MFPT2(parameter, kk, tt)
+    #print("exit time is")
+    #print(exit_t)
 
     energy_samples = []
     MFPT_samples = []
@@ -273,12 +334,30 @@ def compute(parameter):
         print("MFPT is {:15.8e} fs, with an error of {:15.8e}, from inverse method.".format(tau2, MFPT_err2),file=f1) 
         
     c = committor(parameter, kk)
+    exit_t, directional_exit_t = exit_time(parameter, kk, tt, c)
+
     m = []
     for ms in ms_list.values():
         m.append(ms)
     with open(path + '/committor.txt', 'w+') as f1:
         print('\n'.join([''.join(['{:>15}'.format(str(item)) for item in m])]),file=f1)
         print('\n'.join([''.join(['{:15.8f}'.format(item) for item in np.squeeze(c)])]),file=f1)
+    with open(path + '/exit_time.txt', 'w+') as f1:
+        print('\n'.join([''.join(['{:>15}'.format(str(item)) for item in m])]),file=f1)
+        tmp = ''
+        for i in range(len(exit_t)):
+            tmp += ('\n'.join([''.join(['{:15.8f}'.format(exit_t[i])])]))
+        print(tmp, file=f1)
+    with open(path + '/directional_exit_time.txt', 'w+') as f1:
+        print('\n'.join([''.join(['{:>15}'.format(str(item)) for item in m])]),file=f1)
+        tmp = ''
+        for i in range(len(directional_exit_t)):
+            try:
+                tmp += ('\n'.join([''.join(['{:15.8f}'.format(directional_exit_t[i])])]))
+            except:
+                tmp += ('\n'.join([''.join(['{:>15}'.format(directional_exit_t[i])])]))
+        print(tmp, file=f1)
+
     if parameter.data_file == True:    
         get_start_end_lifetime(parameter)  
     

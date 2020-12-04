@@ -13,6 +13,7 @@ from log import log
 from datetime import datetime
 import os
 from milestones import milestones
+from additional_functions import *
 
 __all__ = ['milestoning']
 
@@ -35,7 +36,7 @@ def del_restarts(parameter, path, times, total_fs: int, freq: int) -> None:
                 os.remove(name)
 
 
-def K_order(k, t, t_std, index):
+def K_order(k, t, t_std, index, t_matrix):
     """
     argv:
           k: original K matrix, random order 
@@ -58,6 +59,7 @@ def K_order(k, t, t_std, index):
         mapping.append([k for k,v in index.items() if v == ms][0])
     dimension = len(k)
     k_new = np.zeros((dimension, dimension)).astype(int)
+    t_matrix_new = np.zeros((dimension, dimension)).astype(float)
     t_new = np.zeros(dimension)
     t_std_new = np.zeros(dimension)
     for dimY in range(dimension):
@@ -65,7 +67,8 @@ def K_order(k, t, t_std, index):
         t_std_new[dimY] = t_std[mapping[dimY],[0]]
         for dimX in range(dimension):
             k_new[dimX][dimY] = k[mapping[dimX]][mapping[dimY]]
-    return k_new, t_new, t_std_new, index_new
+            t_matrix_new[dimX][dimY] = t_matrix[mapping[dimX]][mapping[dimY]]
+    return k_new, t_new, t_std_new, index_new, t_matrix_new
 
 
 def backup(parameter, files: list) -> None:
@@ -81,25 +84,40 @@ def backup(parameter, files: list) -> None:
                 os.makedirs(backup_Folder)
             copy(pardir + '/current' + file, backup_Folder + file)
         
-
+def get_traj_amount(struPath):
+    '''
+    Description: This function is used to find the next non-existent folder
+        So if we have the folders 
+        crd/1_2/1, crd/1_2/2, crd/1_2/3
+        This would return 4
+    Parameters: struPath, the path that we are looking at. So for the example in the 
+        description, this would be 'crd/1_2'
+    Returns: next_frame, which is the next non-existent folder (4 in the example)
+    '''
+    next_frame = 1
+    while True:
+        pdbPath = struPath + '/' + str(next_frame) 
+        if os.path.exists(pdbPath):
+            next_frame += 1
+        else:
+            return next_frame - 1
+            
 def milestoning(parameter, skip_compute):
 #    import multiprocessing as mp
     import pandas as pd
     ms = milestone()
-    scriptPath = os.path.dirname(os.path.abspath(__file__)) 
-    data_path = os.path.join(scriptPath, os.pardir) + '/crd'
-    outputpath = os.path.abspath(os.path.join(scriptPath, os.pardir)) + '/my_project_output'
-    outputpath = outputpath + '/current'
-    if not os.path.exists(outputpath):
-        os.makedirs(outputpath)
+    data_path = parameter.crdPath
+    outputpath = parameter.outputPath + '/current'
+    create_folder(outputpath)
     ms.read_anchors(parameter.AnchorPath)
     
-    files = ['/k.txt', '/k_norm.txt', '/life_time.txt', '/info.txt', '/results.txt', '/list.txt', '/ms_index.npy', '/log', '/committor.txt', '/enhanced_count']
+    files = ['/k.txt', '/k_norm.txt', '/life_time.txt', '/info.txt', '/results.txt', '/list.txt', '/ms_index.npy', '/log', '/committor.txt', '/enhanced_count', '/t.txt']
 #    backup(files)
     
     path_list = []
     anchor_orig_list = []
     enhanced_count = {}
+    total_trajs = {}
     for anchor1 in range(1, parameter.AnchorNum + 1):
         for anchor2 in range(anchor1 + 1, parameter.AnchorNum + 1):
             MSname = str(anchor1) + '_' + str(anchor2)
@@ -118,8 +136,13 @@ def milestoning(parameter, skip_compute):
                     except:
                         enhanced_count[MSname] = 1
                 path_list.append(traj_filepath)
+                if os.path.exists(data_path + '/' + MSname + '/' + str(parameter.iteration) + '/' + str(config) + '/stop.colvars.state'):
+                    try:
+                        total_trajs[MSname] += 1
+                    except:
+                        total_trajs[MSname] = 1
 #                anchor_orig_list.append([anchor1, anchor2])
-
+    print(total_trajs)
     for path in path_list:
         
         start_info = os.path.dirname(os.path.abspath(path)) + '/start.txt'
@@ -173,7 +196,7 @@ def milestoning(parameter, skip_compute):
         if len(anchor_dest) == 0:
             continue
         
-
+            
         for i in range(len(anchor_orig)):    
             name_orig = str(anchor_orig[i][0]) + '_' + str(anchor_orig[i][1])
             name_dest = str(anchor_dest[i][0]) + '_' + str(anchor_dest[i][1])
@@ -183,8 +206,17 @@ def milestoning(parameter, skip_compute):
             
             index1 = [k for k,v in ms.ms_index.items() if v == anchor_orig[i]]
             index2 = [k for k,v in ms.ms_index.items() if v == anchor_dest[i]]
-            
+            '''
+            total_frames = 0
+            temp_path = parameter.crdPath + '/' + str(name_orig) + '/' + str(parameter.iteration)
+            total_trajs = get_traj_amount(temp_path)
+            for j in range(1, total_trajs+1):
+                if os.path.exists(temp_path + '/' + str(j) + '/stop.colvars.state'):
+                    total_frames += 1
+            '''
+            frame_value = total_trajs[name_orig]
             ms.k_count[index1, index2] += 1
+            ms.t_count[index1, index2] += (lifetime[0]/frame_value)
             
             if ms.t_hash.get(name_orig):
                 new_slice = str(ms.t_hash.get(name_orig)) + "," + str(lifetime[i])
@@ -201,17 +233,24 @@ def milestoning(parameter, skip_compute):
             t[i, 0] = np.mean(time_list)
             t_std[i, 0] = np.std(time_list, ddof=1) 
         
-    k_ordered, t_ordered, t_std_ordered, index_ordered = K_order(ms.k_count, t, t_std, ms.ms_index)
+    k_ordered, t_ordered, t_std_ordered, index_ordered, t_matrix_ordered = K_order(ms.k_count, t, t_std, ms.ms_index, ms.t_count)
     ms.k_count = k_ordered.copy()
     t = t_ordered.copy()
     t_std = t_std_ordered.copy()
-    ms.ms_index = index_ordered.copy()    
+    ms.ms_index = index_ordered.copy()
+    ms.t_count = t_matrix_ordered.copy()    
     
     with open(outputpath + '/k.txt', 'w+') as fk:
         m = ['{}_{}'.format(item[0], item[1]) for item in list(ms.ms_index.values())]
         print(''.join(['{:>10}'.format(item) for item in m]),file=fk)
         print('',file=fk)
         print('\n'.join([''.join(['{:10d}'.format(item) for item in row])for row in ms.k_count]),file=fk)
+
+    with open(outputpath + '/t.txt', 'w+') as ft:
+        m = ['{}_{}'.format(item[0], item[1]) for item in list(ms.ms_index.values())]
+        print(''.join(['{:>10}'.format(item) for item in m]),file=ft)
+        print('',file=ft)
+        print('\n'.join([''.join(['{:10.2f}'.format(item) for item in row])for row in ms.t_count]),file=ft)
         
     with open(outputpath + '/life_time.txt', 'w+') as f1:
         m = ['{}_{}'.format(item[0], item[1]) for item in list(ms.ms_index.values())]

@@ -51,6 +51,7 @@ else:
     if seek == False:
         log('ScMiles restarted. Continuing seek step.')
         parameter.MS_list = milestones(parameter).initialize(status=status)
+        parameter.restart = False
     elif sample == False:
         log('ScMiles restarted. Continuing sampling step.')
         parameter.MS_list = milestones(parameter).read_milestone_folder()
@@ -68,7 +69,7 @@ if "Preparing for more free trajectories" in lastLog:
 while True:
     free_trajs = traj(parameter, jobs)
     
-    # apply harmonic constraints that populate samples at each milestones.
+    # apply harmonic constraints that populate samples at each milestones
     if parameter.MS_list != parameter.finished_constain:
         samples.constrain_to_ms()   # start to constrain
     

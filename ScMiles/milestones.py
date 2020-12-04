@@ -392,16 +392,14 @@ class milestones:
         from shutil import copy
         from run import run
         milestones = set()
-        launch = []
-        for i in range(self.parameter.AnchorNum):
-            launch.append(False)
+        launch = False
         #prepare scripts
         if self.parameter.milestone_search  == 1:
             colvar(self.parameter, free='yes', initial='yes').generate()  
         for an in range(1, self.parameter.AnchorNum + 1):
             initialNum = self.__get_next_frame_num(self.parameter.seekPath + '/structure' + str(an))
             if self.parameter.restart == True and initialNum > 1:
-                self.edit_submit_scripts(self.parameter.seekPath + '/structure' + str(an),None,initialNum)
+                self.edit_submit_scripts(self.parameter.seekPath + '/structure' + str(an), initialNum)
             else:
                 next_script = initialNum
                 for i in range(self.parameter.initial_traj):
@@ -419,21 +417,19 @@ class milestones:
             for i in range(last_frame - self.parameter.initial_traj, last_frame):
                 if os.path.exists(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i) + '/submit'):
                     run(self.parameter).submit(self.parameter.seekPath + '/structure' + str(an) + '/' + str(i) + '/submit')
-                    launch[an - 1] = True
+                    launch = True
         if self.parameter.restart == False:        
             log("{} trajectories started from each anchor, run for {} ps.".format(self.parameter.initial_traj, self.parameter.initialTime))
-        elif True in launch:
+        elif launch == True:
             log("Remaining trajectories have been launched")
         else:
             print('No new trajectories launched for this iteration. Starting next iteration')        
 
-        if True in launch:
+        if launch == True:
             finished = []
             while True:
                 for an in range(1, self.parameter.AnchorNum + 1):
                     MSname = 'a' + str(an)
-                   #if launch[an-1] == False:
-                        #finished.append(MSname)
                     if not run(self.parameter).check(MSname=MSname):
                         continue
                     elif MSname in finished:
@@ -448,7 +444,6 @@ class milestones:
             curt_frame = self.__get_next_frame_num(self.parameter.seekPath + '/structure' + str(i))
             for traj in range(1, curt_frame):
                 path = self.parameter.seekPath + '/structure' + str(i) + '/' + str(traj)
-                #print(path)
                 if not os.path.exists(path):
                     continue
                 if os.path.isfile(path + '/end.txt'):
@@ -457,7 +452,6 @@ class milestones:
                     timetmp, final_ms = self.get_final_ms(path)
                 else:
                     timetmp, final_ms = self.get_final_ms(path, anchor=i)
-                #print(final_ms)
                 if final_ms == [0, 0]:
                     continue
                 name = 'MS' + str(final_ms[0]) + '_' + str(final_ms[1])
@@ -478,7 +472,6 @@ class milestones:
                 os.makedirs(ms_path)
                 copy(path + '/' + self.parameter.outputname + '.restart.coor', 
                     ms_path + '/seek.ms.pdb')
-                #print(self.parameter.namd_conf)
                 if self.parameter.namd_conf == True:
                     copy(path + '/' + self.parameter.outputname + '.xst', ms_path + '/sample.xsc')
                 milestones.add(name)
@@ -488,7 +481,7 @@ class milestones:
             self.__restore_scripts(self.parameter.seekPath + '/structure' + str(i), traj_frame)
 
         log("{} milestones have been identified.".format(len(milestones)))  
-        self.parameter.restart = False
+        #self.parameter.restart = False
         return milestones  
 
     def __restore_scripts(self, path, traj_frame):
@@ -555,12 +548,11 @@ class milestones:
         values = [abs(float(x)) for x in numbers]
         return values, time    
     
-    def edit_submit_scripts(self, path, restart_scripts,frame_number):
-        #1 is done, 0 needs to restart
+    def edit_submit_scripts(self, path, frame_num):
         import os
         from fileinput import FileInput
 
-        for i in range(1, frame_number + 1):
+        for i in range(1, frame_num + 1):
             next_line = False
             run = False
             current_path = path + '/' + str(i) + '/submit'
