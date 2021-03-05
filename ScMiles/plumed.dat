@@ -1,0 +1,203 @@
+CV1: TORSION ATOMS=5,7,9,15
+CV2: TORSION ATOMS=7,9,15,17
+
+
+CUSTOM ...
+        LABEL=cosphi
+        ARG=CV1
+        VAR=x1
+        FUNC=cos(x1)
+        PERIODIC=-pi,pi
+... CUSTOM
+
+CUSTOM ...
+        LABEL=cospsi
+        ARG=CV2
+        VAR=x1
+        FUNC=cos(x1)
+        PERIODIC=-pi,pi
+... CUSTOM
+
+LOWER_WALLS ARG=cosphi AT=-0.88 KAPPA=80000.0
+LOWER_WALLS ARG=cospsi AT=-0.88 KAPPA=80000.0
+
+CUSTOM ...
+LABEL=neighbor
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-0.0)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=1_4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-1.5708)^2)-sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=1_8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-1.5708)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=2_4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-1.0472)^2)-sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=2_8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-1.0472)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=3_4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-0.5236)^2)-sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=3_8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-0.5236)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=5_4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2+0.5236)^2)-sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=5_8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2+0.5236)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=6_4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2+1.22173)^2)-sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=6_8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2+1.22173)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=7_4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+0.5236)^2+(x2+1.22173)^2)-sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=7_8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+0.5236)^2+(x2+1.22173)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=9_4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-0.0)^2+(x2+1.22173)^2)-sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=9_8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-0.0)^2+(x2+1.22173)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=10_4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-0.5236)^2+(x2+1.22173)^2)-sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=10_8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-0.5236)^2+(x2+1.22173)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=11_4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-1.0472)^2+(x2+1.22173)^2)-sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=11_8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-1.0472)^2+(x2+1.22173)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=12_4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-1.5708)^2+(x2+1.22173)^2)-sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=12_8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-1.5708)^2+(x2+1.22173)^2)-sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+nei: RESTRAINT ...
+ARG=neighbor
+AT=0.0
+KAPPA=20000.0
+... nei:
+walls: LOWER_WALLS ...
+ARG=1_4,1_8,2_4,2_8,3_4,3_8,5_4,5_8,6_4,6_8,7_4,7_8,9_4,9_8,10_4,10_8,11_4,11_8,12_4,12_8
+AT=0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+KAPPA=20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0,20000.0
+... walls:
+
+PRINT STRIDE=1 ARG=CV1,CV2,neighbor,1_4,1_8,2_4,2_8,3_4,3_8,5_4,5_8,6_4,6_8,7_4,7_8,9_4,9_8,10_4,10_8,11_4,11_8,12_4,12_8 FILE=Aladipep.colvars.traj

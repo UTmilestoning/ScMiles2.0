@@ -37,82 +37,68 @@ parameter.initialize()
 if parameter.correctParameters == False:
     print('Please update your input files and restart ScMiles.')
     sys.exit()
-jobs = run(parameter)
-samples = sampling(parameter, jobs)
-lastLog = ""
+
+#status = 1
 
 # initialize with reading anchor info and identifying milestones 
-if len(parameter.MS_list) != 0:
-    pass
-elif parameter.restart == False:
-    parameter.MS_list = milestones(parameter).initialize(status=status)
+if parameter.restart == True:
+    seek, sample, lastLog = read_log(parameter,status)
 else:
-    seek, sample, lastLog = read_log(parameter, status)
-    if seek == False:
-        log('ScMiles restarted. Continuing seek step.')
-        parameter.MS_list = milestones(parameter).initialize(status=status)
-    elif sample == False:
-        log('ScMiles restarted. Continuing sampling step.')
+    sample = False
+    seek = False
+    lastLog = ""
+
+#print(lastLog)
+
+if len(parameter.MS_list) != 0 or seek == True: #if a customMS is defined by the user
+    pass
+else:
+    parameter.MS_list = milestones(parameter).initialize(status=status, lastLog=lastLog)
+
+if sample == False:
+    if not parameter.customMS_list:
         parameter.MS_list = milestones(parameter).read_milestone_folder()
-    else:
-        #Check for new sampling
-        log('ScMiles restarted. Continuing free trajectories step.')
-        parameter.MS_list = milestones(parameter).read_milestone_folder()
-                
+    launch(parameter, step='sample').launch_trajectories()
+    log("Initial sampling completed")
+else:
+    launch(parameter, step='sample').move_files()
+           
 if parameter.milestone_search == 3:
     parameter.milestone_search = 2 #everything after this point is the same for both and I already used 2 for everything so I am changing it to 2 here
-if "Preparing for more free trajectories" in lastLog:
-    parameter.restart = False
-    lastLog = None
-    
-while True:
-    free_trajs = traj(parameter, jobs)
-    
-    # apply harmonic constraints that populate samples at each milestones.
-    if parameter.MS_list != parameter.finished_constain:
-        samples.constrain_to_ms()   # start to constrain
-    
-    samples.check_sampling()    # check if the samplings are finished
 
-    # next iteration; for iteration methods
-    if parameter.restart == False:
-        if parameter.method == 1:
-            parameter.iteration += 1 
-        else:
-            parameter.iteration = 1 
+while True:
+ 
+    # apply harmonic constraints that populate samples at each milestones
+    if parameter.customMS_list == None:
+        parameter.MS_list = milestones(parameter).read_milestone_folder()
+    else:
+        parameter.MS_list = parameter.customMS_list.copy()
+
+    trajectories = traj(parameter)
+#    parameter.skip_compute = False
         
-    skip_step = False
-    skip_logs = ['Computing...', 'Mean first passage time', 'Preparing for more free trajectories', 'Finished writing files end.txt and lifetime.txt']
-    if parameter.restart == True and lastLog:
-        for item in skip_logs:
-            if item in lastLog:
-                skip_step = True
-    # lauch free runs from the samples
-    if skip_step == False:
-        current_snapshot, skip_compute, new_milestones = free_trajs.launch(lastLog = lastLog)
-        log('Finished writing files end.txt and lifetime.txt')
+    #initial_sampling = False
+    # next iteration; for iteration methods
+    if parameter.method == 1:
+        parameter.iteration += 1 
+    else:
+        parameter.iteration = 1
+    
+    current_snapshot = trajectories.launch(lastLog = lastLog)
 
     if parameter.customMS_list:
         parameter.MS_list = milestones(parameter).read_milestone_folder()
-    skip_step = False
-    # compute kernel, flux, probability, life time of each milstone, and MFPT as well
-    skip_logs = ['Mean first passage time', 'Preparing for more free trajectories']
-    if lastLog:
-        for item in skip_logs:
-            if item in lastLog:
-                skip_step = True
-    if skip_step == False:
-        if parameter.ignorNewMS == True:
-            skip_compute = False
-        analysis_kernel(parameter, skip_compute)
-    
-    parameter.restart = False
+    # compute kernel, flux, probability, life time of each milstone, and MFPT as well                
+    analysis_kernel(parameter)
+
+    parameter.skip_MS = []    
     if parameter.customMS_list:
         parameter.MS_list = parameter.customMS_list.copy()
+        parameter.customMS_list = None
     lastLog = None
-    #break
+    '''
     # If any NEW milestone has been reached
-    if len(parameter.MS_new) != 0 and not parameter.ignorNewMS:
+    if len(parameter.MS_new) != 0 and not parameter.ignorNewMS and parameter.skip_compute == False:
         log("Reached {} new milestone(s).".format(len(parameter.MS_new)))
         temp = parameter.MS_new.copy()
         for ms in temp:
@@ -122,8 +108,9 @@ while True:
             if parameter.method == 1:
                 parameter.finished_constain.add(name)
         del temp   
-#        continue
-    
+        continue
+    #break
+    '''
     # break if all the snapshots have been used
     if parameter.method == 0 and current_snapshot >= parameter.nframe:
         log("All the snapshots have been used...")
@@ -135,13 +122,13 @@ while True:
         log("Reached max iteration...")
         break
     
-    elif skip_compute == True:
+    elif parameter.skip_compute == True:
         log('Preparing for more free trajectories...')
         MFPT_temp = 1
         parameter.MFPT = 0
-        parameter.Finished = set()
-        for item in new_milestones:
-            parameter.MS_list.add(item[0])
+        #parameter.Finished = set()
+        #for item in new_milestones:
+        #    parameter.MS_list.add(item[0])
     # if no results
     
     elif np.isnan(parameter.MFPT) or parameter.MFPT < 0:

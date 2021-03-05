@@ -18,11 +18,14 @@ Note:
 '''
 
 #from log import log
-
+import os
+import re
+import pandas as pd
+import numpy as np
 
 class colvar:
     def __init__(self, parameter, anchor1=None, anchor2=None, 
-                 free=None, initial=None, 
+                 free=None, initial=None, step=None, 
                  config_path=None, variables=None):
         self.parameter = parameter
         self.anchor1 = anchor1
@@ -33,8 +36,9 @@ class colvar:
         for i in range(1, self.colvars_number + 1):
             self.variables.append("")
         self.initial = initial
-        self.config_path = self.parameter.ScMilesPath + "/colvar_free.conf" if self.free == 'yes' else self.parameter.ScMilesPath + "/colvar.conf"
-
+        self.step = step
+        self.config_path = self.parameter.ScMilesPath + "/colvar_free.conf" if self.step != 'sample' else self.parameter.ScMilesPath + "/colvar.conf"
+        
 
     def __exit__(self, exc_type, exc_value, traceback):
         return 
@@ -126,7 +130,7 @@ class colvar:
         first = True
         section = 1
         name_get = False
-        with open(file=self.parameter.inputPath+'/colvar.txt') as f:
+        with open(file=self.parameter.inputPath + '/colvar.txt') as f:
             for line in f:
                 if '{' in line:
                     first = False
@@ -142,8 +146,6 @@ class colvar:
                     if 'name' in line and name_get == False:
                         line = "  name rmsd" + str(anchor)
                         name_get = True
-#                    if 'anchor' in line:
-#                        line = line.replace("anchor", '('+str(self.parameter.anchors[anchor-1][0])+')')
                     if 'anchor' in line:
                         for i in range(0, self.colvars_number):
                             line = line.replace("anchor", '('+str(self.parameter.anchors[anchor-1][i])+')', 1)
@@ -157,8 +159,7 @@ class colvar:
 
     def generate(self):    
         '''This is the main function that generates colvars '''
-        # scriptPath = os.path.dirname(os.path.abspath(__file__))
-        if self.initial == 'yes': 
+        if self.step == 'seek': 
             outputFrequency = 1
         else:
             outputFrequency = self.parameter.colvarsTrajFrequency
@@ -166,7 +167,7 @@ class colvar:
         fconf = open(self.config_path, 'w+')
         print("colvarsTrajFrequency      {}".format(outputFrequency), file=fconf)
         print("colvarsRestartFrequency	 {}".format(self.parameter.colvarsRestartFrequency), file=fconf)
-        if self.free == 'yes':
+        if self.step == 'free' or self.step == 'seek':
             print("scriptedColvarForces on", file=fconf)
         if self.parameter.customColvars == True:
             print("", file=fconf)
@@ -175,9 +176,9 @@ class colvar:
                     print(line, file=fconf)
         fconf.close()
         
-        if self.free == 'yes':
+        if self.step != 'sample':
             if self.parameter.milestone_search == 2:
-                if self.initial == 'yes':
+                if self.step == 'seek':
                     self.__grid_seek()
                 else:
                     self.__grid_colvars()
@@ -252,7 +253,7 @@ class colvar:
         if self.parameter.pbc != [] and abs(self.anchor1 - self.anchor2) > 1:
             center = 180
         print("  centers {}".format(center), file=fconf)
-        print("  forceConstant {}".format(self.parameter.forceConst), file=fconf)
+        print("  forceConstant {}".format(self.parameter.forceConst[0]), file=fconf)
         print("}", file=fconf)
         fconf.close()
 
@@ -323,24 +324,24 @@ class colvar:
                 fconf.close()
         return colvarList, centers
     
-    def __harmonic2D(self, center=None):
+    def __harmonic2D(self, center=None, colvar=0):
         fconf = open(self.config_path, 'a')
         print("harmonic {", file=fconf)
         print("  colvars neighbor", file=fconf)
         if not center:
             center = 0
         print("  centers {}".format(str(center)), file=fconf)
-        print("  forceConstant {}".format(self.parameter.forceConst), file=fconf)
+        print("  forceConstant {}".format(self.parameter.forceConst[colvar]), file=fconf)
         print("}", file=fconf)
         fconf.close()
 
-    def __harmonicWalls(self, colvarList, centers):
+    def __harmonicWalls(self, colvarList, centers, colvar=0):
         fconf = open(self.config_path, 'a')
         print("\n", file=fconf)
         print("harmonicWalls {", file=fconf)
         print("  colvars {}".format(colvarList), file=fconf)
         print("  lowerWalls {}".format(centers), file=fconf)
-        print("  lowerWallConstant {}".format(self.parameter.forceConst), file=fconf)
+        print("  lowerWallConstant {}".format(self.parameter.forceConst[colvar]), file=fconf)
         print("}", file=fconf)
         fconf.close()
 
@@ -373,6 +374,11 @@ class colvar:
                 value = (anchor1_coors[i] + anchor2_coors[i])/2
                 neighbor = [value - deltas[i], value, value + deltas[i]]
                 neighbor.sort()
+                if value == 0.0:
+                    if 180 - deltas[i]/2 in [anchor1_coors[i],anchor2_coors[i]]:
+                        value = 180
+                        neighbor = [180 - deltas[i]/2, 180, -180 + deltas[i]/2]
+                print(value, self.anchor1, self.anchor2)
                 neighbor_name = names[i]
             else:
                 length_values = [anchor1_coors[i], anchor1_coors[i] + deltas[i]/2, anchor1_coors[i] - deltas[i]/2]
@@ -380,6 +386,7 @@ class colvar:
                 length.append(length_values)
                 length_names.append(names[i])
                 
+        #print(neighbor_name)
         equations = []
         #greater than, name first -- less than, name last
         #always parallel first
@@ -419,6 +426,43 @@ class colvar:
             count += 1
             eq = eq.replace('- -', '+ ')
             eq = eq.replace('--', '+')
+            if self.parameter.grid_pbc in eq:
+                if eq.count(self.parameter.grid_pbc) == 1:
+                    if '180.0' in eq:
+                        if 'step(-180.0-' + self.parameter.grid_pbc + ')' in eq:
+                            eq = 'step(' + self.parameter.grid_pbc + ')*step(180.0-' + self.parameter.grid_pbc + ')'
+                        elif 'step(' + self.parameter.grid_pbc + '-180.0' + ')' in eq:
+                            eq = 'step(-' + self.parameter.grid_pbc + ')*step(' + self.parameter.grid_pbc + '+180.0)'  
+                        elif 'step(180.0-' + self.parameter.grid_pbc + ')' in eq:
+                            eq = 'step(' + self.parameter.grid_pbc + ')*step(180.0-' + self.parameter.grid_pbc + ')'
+                        elif 'step(' + self.parameter.grid_pbc + '+180.0)' in eq:
+                            eq = 'step(-' + self.parameter.grid_pbc + ')*step(' + self.parameter.grid_pbc + '+180.0)'  
+                    elif str(180 - self.parameter.deltas[names.index(self.parameter.grid_pbc)]) in eq:
+                        second_value = str(180 - self.parameter.deltas[names.index(self.parameter.grid_pbc)])
+                        if '.' not in second_value:
+                            second_value += '.0'
+                        if 'step(-' + second_value + '-' + self.parameter.grid_pbc + ')' in eq:
+                            eq = 'step(-' + self.parameter.grid_pbc + ')*' + eq
+                        elif 'step(' + self.parameter.grid_pbc + '-' + second_value + ')' in eq:
+                            eq = 'step(' + self.parameter.grid_pbc + ')*' + eq  
+                        elif 'step(' + second_value + '-' + self.parameter.grid_pbc + ')' in eq:
+                            eq = 'step(' + self.parameter.grid_pbc + ')*' + eq
+                        elif 'step(' + self.parameter.grid_pbc + '+' + second_value + ')' in eq:
+                            eq = 'step(-' + self.parameter.grid_pbc + ')*' + eq  
+                    elif str(180 - self.parameter.deltas[names.index(self.parameter.grid_pbc)]/2) in eq:
+                        second_value = str(180 - self.parameter.deltas[names.index(self.parameter.grid_pbc)]/2)
+                        if '.' not in second_value:
+                            second_value += '.0'
+                        if 'step(-' + second_value + '-' + self.parameter.grid_pbc + ')' in eq:
+                            eq = 'step(-' + self.parameter.grid_pbc + ')*' + eq
+                        elif 'step(' + self.parameter.grid_pbc + '-' + second_value + ')' in eq:
+                            eq = 'step(' + self.parameter.grid_pbc + ')*' + eq  
+                        elif 'step(' + second_value + '-' + self.parameter.grid_pbc + ')' in eq:
+                            eq = 'step(' + self.parameter.grid_pbc + ')*' + eq
+                        elif 'step(' + self.parameter.grid_pbc + '+' + second_value + ')' in eq:
+                            eq = 'step(-' + self.parameter.grid_pbc + ')*' + eq  
+
+                        
             print('colvar {', file = fconf)
             print('  name ' + str(count), file = fconf)
             print('  customFunction ' + eq, file=fconf)
@@ -435,16 +479,9 @@ class colvar:
         else:
             return 'step(' + str(value1) + '-' + str(value2) + ')' + ' + ' + 'step(' + str(value3) + '-' + str(value4) + ')'
         
-
-            
-        
         
     def __grid_sampling(self):
-        '''
-        [anchor1, anchor2] = list(map(int, (re.findall('\d+', milestone))))
-        anchor1_coor = self.parameters.anchors[anchor1-1]
-        anchor2_coor = self.parameters.anchors[anchor2-1]
-        '''
+
         anchor1_coor = self.parameter.anchors[self.anchor1-1]
         anchor2_coor = self.parameter.anchors[self.anchor2-1]
         
@@ -454,6 +491,10 @@ class colvar:
                 neighbor = i
         delta_value = self.parameter.deltas.copy() #change this later, or have user input value
         center = (anchor1_coor[neighbor] + anchor2_coor[neighbor])/2
+        if self.parameter.grid_pbc != False:
+            if names[neighbor] == self.parameter.grid_pbc:
+                if abs(anchor1_coor[neighbor]) + delta_value[neighbor]/2 == 180 and abs(anchor1_coor[neighbor]) == abs(anchor2_coor[neighbor]):
+                    center = 180
         fconf = open(self.config_path, 'a')
         print("\ncolvar {", file=fconf)
         print("  name neighbor", file=fconf)
@@ -472,7 +513,8 @@ class colvar:
             print("  }", file=fconf)
         fconf.close()
         count = 0
-        self.__harmonic2D(center)
+        print(neighbor)
+        self.__harmonic2D(center, neighbor)
         fconf = open(self.config_path, 'a')    
         for i in range(len(names)):
             if i == neighbor:
@@ -485,12 +527,11 @@ class colvar:
             print("  colvars length{}".format(count), file=fconf)
             print("  lowerWalls {}".format(walls[0]), file=fconf)
             print("  upperWalls {}".format(walls[1]), file=fconf)        
-            print("  lowerWallConstant {}".format(self.parameter.forceConst), file=fconf)
-            print("  UpperWallConstant {}".format(self.parameter.forceConst), file=fconf)
+            print("  lowerWallConstant {}".format(self.parameter.forceConst[i]), file=fconf)
+            print("  UpperWallConstant {}".format(self.parameter.forceConst[i]), file=fconf)
             print("} \n", file=fconf)
             
         fconf.close()  
-        
         
     def __get_colvars(self):
         count = 0
@@ -513,13 +554,332 @@ class colvar:
                     tmp = []
         return colvar_list, names
     
+    def get_final_ms(self, path, anchor=None):
+        '''
+        Description: After launching trajectories, this looks for a stop.colvars.state file
+            If the file exists, it is then read in and we find the ending milestone
+            If we return -1, [0,0], this means that for some reason there is no ending milestone and
+            end.txt and lifetime.txt are not printed. Then at this point the trajectory is not considered
+            in the final computations.
+        Arguments:
+            path: This is the path that we are looking at, and where we will extract the stop.colvars.state
+                information from
+            anchor: This is
+        '''
+        if self.parameter.software == 'namd':
+            state = path + "/stop.colvars.state"
+        else:
+            state = path + '/' + self.parameter.outputname + '.colvars.traj'
+        if not os.path.isfile(state):
+            return -1, [0, 0]  
+        final_ms = [0, 0]
+        
+        # read state file generated at termination point 
+        # smallest rmsd indicates new cell #
+        if self.parameter.software == 'namd':
+            RMSDs, lifetime = self.read_state(state)
+        else:
+            RMSDs, lifetime = self.read_traj(state)
+            if RMSDs == None:
+                return -1, [0,0]
+        final_ms[0] = RMSDs.index(sorted(RMSDs)[0]) + 1
+        
+        if self.parameter.milestone_search == 2 or self.parameter.milestone_search == 3:
+            if anchor: #this just means if it is seek
+                if self.parameter.grid_pbc:
+                    colvars, names = self.__get_colvars()
+                colvar_number = len(self.parameter.anchors[0])
+                anchor_values = self.parameter.anchors[anchor-1]
+                count = 0
+                values = []
+                if self.parameter.software == 'namd':
+                    for i in range(colvar_number):
+                        if i == 0:
+                            values.append(1)
+                        else:
+                            values.append(2)
+                else:
+                    values.append(colvar_number*2-1)
+                #print(path)
+                end_value = None
+                if self.parameter.software == 'namd':
+                    for i in range(len(RMSDs)-len(values) + 1):
+                        if end_value:
+                            break
+                        count = 0
+                        for j in range(len(values)):
+                            if int(RMSDs[i+j]) == values[j]:
+                                count += 1
+                            else:
+                                break
+                            if count == colvar_number:
+                                end_value = i + colvar_number #this is the equation number
+                else:
+                    for i in range(len(RMSDs)):
+                        if RMSDs[i] == values[0]:
+                            end_value = i
+                            break
+                #print(end_value) 
+                #total_equations = 3*colvar_number
+                #end_value = 18
+                #final = total_equations / end_value
+                if self.parameter.software == 'namd':
+                    new_end = int(end_value / colvar_number)
+                else:
+                    new_end = end_value + 1
+                possible = []
+                new_anchor = []
+                for i in range(colvar_number):
+                    a = [round(anchor_values[i] - self.parameter.deltas[i],5), round(anchor_values[i] + self.parameter.deltas[i],5)]
+                    possible.append([min(a), i])
+                    possible.append([max(a), i])
+                    new_anchor.append(0)
+                #print(possible)
+                #print
+                #print(new_anchor)
+                #print(type(self.parameter.anchors))
+                neighbor = possible[new_end-1][0]
+                neighbor_name = possible[new_end-1][1]
+                #print(neighbor_name)
+                for i in range(colvar_number):
+                    if neighbor_name == i:
+                        new_anchor[i] = neighbor
+                    else:
+                        new_anchor[i] = anchor_values[i]
+                final_ms = [anchor, 0]
+                if self.parameter.software == 'gromacs':
+                    for i in range(len(new_anchor)):
+                       new_anchor[i] = round(new_anchor[i],5)
+                #print(anchor_values)
+                #print(new_anchor)
+                if self.parameter.grid_pbc != False:
+                        if names[neighbor_name] == self.parameter.grid_pbc:
+                            if new_anchor[neighbor_name] > 180:
+                                new_anchor[neighbor_name] = -180 + self.parameter.deltas[neighbor_name]/2
+                            elif new_anchor[neighbor_name] < -180:
+                                new_anchor[neighbor_name] = 180 - self.parameter.deltas[neighbor_name]/2
+                print(new_anchor)
+                for i in range(self.parameter.AnchorNum):
+                    for j in range(colvar_number):
+                        if round(self.parameter.anchors[i][j],5) == round(new_anchor[j],5):
+                            if j == len(new_anchor) - 1:
+                                final_ms[1]= i+1
+                                break
+                        else:
+                            break
+                final_ms.sort()
+                if anchor not in final_ms:
+                    return -1, [0,0]
+                
+            else:
+                for i in range(len(self.parameter.anchors)):
+                    for j in range(len(self.parameter.anchors[0])):
+                        delta_values = self.parameter.deltas[j]/2
+                        values = [self.parameter.anchors]
+                if self.parameter.grid_pbc:
+                   colvars, names = self.__get_colvars()                
+                colvar_number = len(self.parameter.anchors[0])
+                start_ms = pd.read_csv(path + '/start.txt', header=None, delimiter=r'\s+').values.tolist()[0]
+                start_anchors = [self.parameter.anchors[start_ms[0] - 1], self.parameter.anchors[start_ms[1] - 1]]
+                count = 0
+                values = []
+                end_value = None
+                if self.parameter.software == 'namd':
+                    for i in range(colvar_number):
+                        if i == 0:
+                            values.append(1)
+                        else:
+                            values.append(2)
+                    for i in range(len(RMSDs)-len(values) + 1):
+                        if end_value:
+                            break
+                        count = 0
+                        for j in range(len(values)):
+                            if int(RMSDs[i+j]) == values[j]:
+                                count += 1
+                            else:
+                                break
+                            if count == colvar_number:
+                                end_value = i + colvar_number #this is the equation number            
+                else:
+                    for i in range(len(RMSDs)):
+                        if RMSDs[i] == (colvar_number*2) - 1:
+                            end_value = (i+1)*colvar_number
+                
+                length = []
+                #print(end_value)
+                #print(start_anchors)
+                for i in range(len(start_anchors[0])):
+                    if round(start_anchors[0][i],5) != round(start_anchors[1][i],5):
+                        if start_anchors[0][i] > start_anchors[1][i]:
+                            upper_ms = 0
+                            lower_ms = 1
+                        else:
+                            upper_ms = 1
+                            lower_ms = 0
+                        neighbor_values = [round(start_anchors[0][i],5), round(start_anchors[1][i],5)]
+                        neighbor_values.sort()
+                        neighbor_index = i
+                        length.append("n")
+                    else:
+                        length.append(round(start_anchors[0][i],5))
+                if end_value == None:
+                    return -1, [0,0]
+                #print(neighbor_index)
+                new_neighbor = None  
+                # first are our 2 parallel planes, where our lengths are the same and our neighbor changes
+                if end_value == colvar_number*1:
+                    new_neighbor = neighbor_values[1] + self.parameter.deltas[neighbor_index]
+                    final_ms[0] = start_ms[upper_ms]
+                elif end_value == colvar_number*2:
+                    new_neighbor = neighbor_values[0] - self.parameter.deltas[neighbor_index]
+                    final_ms[0] = start_ms[lower_ms]
+                if new_neighbor is not None:
+                    length[neighbor_index] = new_neighbor
+                #now we have our perpendicular planes in each direction.
+                else:
+                    #print(path)
+                    total_statements = (2 + (len(self.parameter.anchors[0])-1)*4)*colvar_number
+                    remaining = total_statements - 2*colvar_number #24
+                    length_cut = remaining / (colvar_number-1) #so 24/2 = 12
+                    mod_end = (end_value - colvar_number*2) % length_cut
+                    end_var_index = (end_value - 2*colvar_number - 1) // length_cut
+                    count = -1
+                    for i in range(len(length)):
+                        if length[i] == 'n':
+                            continue
+                        else:
+                            count += 1
+                            if count == end_var_index:
+                                changing_length = i
+                    #print(path)
+                    if mod_end == colvar_number*1: #first option after parallel
+                        new_neighbor = length[changing_length] + self.parameter.deltas[changing_length]
+                        new_length = neighbor_values[1] 
+                        final_ms[0] = start_ms[upper_ms]
+                    if mod_end == colvar_number*2:
+                        new_neighbor = length[changing_length] + self.parameter.deltas[changing_length]
+                        new_length = neighbor_values[0] 
+                        final_ms[0] = start_ms[lower_ms]
+                    if mod_end == colvar_number*3:
+                        new_neighbor = length[changing_length] - self.parameter.deltas[changing_length]
+                        new_length = neighbor_values[1]
+                        final_ms[0] = start_ms[upper_ms]
+                    if mod_end == 0:
+                        new_neighbor = length[changing_length] - self.parameter.deltas[changing_length]
+                        new_length = neighbor_values[0]
+                        final_ms[0] = start_ms[lower_ms]
+                    
+                    for i in range(len(length)):
+                        if length[i] == 'n':
+                            length[i] = new_length
+                        if i == changing_length:
+                            length[i] = new_neighbor
+                
+
+                if self.parameter.grid_pbc != False:                    
+                    for i in range(len(names)):
+                        if names[i] == self.parameter.grid_pbc:
+                            if length[i] > 180:
+                                length[i] = -180 + self.parameter.deltas[i]/2
+                            if length[i] < -180:
+                                length[i] = 180 - deltas[i]/2
+                #print(final_ms, length)
+                for i in range(self.parameter.AnchorNum):
+                    for j in range(len(length)):
+                        if round(self.parameter.anchors[i][j],5) == round(length[j],5):
+                            if j == len(length) - 1:
+                                final_ms[1]= i+1
+                        else:
+                            break
+                final_ms.sort()
+                if 0 in final_ms or final_ms[0] == final_ms[1]:
+                    return -1, [0,0]            
+        else:
+            if self.parameter.pbc:
+                if final_ms[0] == self.parameter.AnchorNum or final_ms[0] == 1:
+                    # open traj file to read the very last output
+                    # smallest rmsd indicates previous cell #
+                    traj = path + "/" + self.parameter.outputname + ".colvars.traj"
+                    #print(traj)
+                    firstRMSD = self.parameter.colvarsNum + 1
+                    try:
+                        RMSDs_prev = pd.read_fwf(traj, widths=self.parameter.trajWidths).values[-1,firstRMSD:].astype(np.float64).tolist()
+                    except:
+                        return -1, [0, 0]
+                    final_ms[1] = RMSDs_prev.index(sorted(RMSDs_prev)[0]) + 1 
+                else:
+                    final_ms[1] = RMSDs.index(sorted(RMSDs)[1]) + 1 
+            else:
+                # use the second min value for previous cell #
+                final_ms[1] = RMSDs.index(sorted(RMSDs)[1]) + 1 
+            
+            if 'seek' not in path:
+                try:
+                    #print(path + '/start.txt')
+                    start_ms = pd.read_csv(path + '/start.txt', header=None, delimiter=r'\s+').values.tolist()[0]
+                except:
+                    return -1, [0, 0]
+                if start_ms[0] not in final_ms and start_ms[1] not in final_ms:
+                    return -1, [0, 0]
+        final_ms.sort()
+        if float(lifetime) > 1.0:
+            print(final_ms, lifetime, path)
+        final_info = path + '/end.txt'
+        if not os.path.isfile(final_info):
+            with open(final_info, 'w+') as f1:
+                print(final_ms[0], final_ms[1], file=f1)    
+        time_info = path + '/lifetime.txt'
+        lifetime *= self.parameter.timeFactor
+        if not os.path.isfile(time_info):
+            with open(time_info, 'w+') as f1:
+                print(lifetime, file=f1)    
+        return lifetime, final_ms
+    
+    def read_state(self, path):
+        file = open(path, 'r').read()
+        time = int(re.findall(r"[-+]?\d*\.\d+|\d+", file)[0])
+        numbers = re.findall(r"[-+]?\ *[0-9]+\.?[0-9]*(?:[eE]\ *[-+]?\ *[0-9]+)", file)
+        numbers.pop(0)
+        numbers = numbers[self.parameter.colvarsNum:]
+        values = [abs(float(x)) for x in numbers]
+        return values, time
+
+    def read_traj(self, path):
+        last_line = None
+        second_to_last = None
+        with open(path) as r:
+            for l in r:
+                 line = l.split()
+                 if line != []:
+                    second_to_last = last_line
+                    last_line = line
+        #print(last_line)
+        #last_line = last_line.split()
+        #time = second_to_last.pop(0)
+        time = last_line.pop(0)
+        for i in range(len(self.parameter.anchors[0])):
+            last_line.pop(-1)
+        values = [abs(float(x)) for x in last_line]
+        if self.parameter.milestone_search == 2:
+            time = second_to_last.pop(0)
+            for i in range(len(self.parameter.anchors[0])):
+                second_to_last.pop(-1)
+            values = [abs(float(x)) for x in second_to_last]
+            
+        return values, time
+        
+
     
 if __name__ == '__main__':
     from parameters import *
     new = parameters()
+    new.restart = False
     new.initialize()
     new.milestone_search = 2
-    new.deltas = [30,30,30]
+    print(new.forceConst)
+    #new.deltas = [30,30,30]
     #colvar(new, anchor1=1, anchor2=2).generate()
-    colvar(new, anchor1=19, anchor2=20).generate()
+    #colvar(new, anchor1=19, anchor2=20).generate()
+    print(colvar(new, step='sample', anchor1=1, anchor2=2).generate())
     

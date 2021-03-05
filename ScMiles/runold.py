@@ -1,0 +1,595 @@
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jul  3 17:25:27 2018
+
+@author: Wei Wei
+
+This subroutine generates NAMD configuration based on templete and submits jobs.
+"""
+
+import os, time
+from shutil import copy
+import subprocess
+from shutil import copyfile
+from fileinput import FileInput
+#from find_milestone import *
+from milestones import *
+from namd_conf_custom import *
+from additional_functions import *
+from plumed import *
+
+
+class run:
+    
+    def __init__(self, parameter) -> None:
+        self.parameter = parameter
+        
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        return 
+            
+    def __repr__(self) -> str:
+        return ('Submit jobs.')
+
+    def prepare_trajectory(self, a1=None, a2=None, snapshot=None, frame=None, initial=None, initialNum=None, script=None, new_sampling=None):
+        #prepare script and namd file
+        lst = sorted([a1, a2])
+        if snapshot: #works for gromacs and namd
+            path = self.parameter.crdPath + '/' + str(lst[0]) + '_' + str(lst[1]) + '/' + str(self.parameter.iteration) + "/" + str(snapshot)
+        elif initial:
+            path = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum)
+        else:
+            path = self.parameter.crdPath + '/' + str(lst[0]) + '_' + str(lst[1])
+        script_path = path + '/submit'
+        if self.parameter.software == 'namd': #for namd
+            if snapshot or initial:
+                origColvar = self.parameter.ScMilesPath + "/colvar_free.conf"
+                destColvar = path + "/colvar_free.conf"
+                namd_path = path + '/free.namd'
+            else:
+                origColvar = self.parameter.ScMilesPath + "/colvar.conf"
+                destColvar = path + "/colvar.conf"
+                namd_path = path + '/sample.namd'
+        else: #for gromacs (it is still called namd path but it is a gromacs file)
+            if snapshot or initial:
+                origColvar = self.parameter.ScMilesPath + "/plumed_free.dat"
+                destColvar = path + "/plumed_free.dat"
+                namd_path= path + '/free.mdp'
+                original_path = self.parameter.inputPath + '/free.mdp'
+            else:
+                origColvar = self.parameter.ScMilesPath + "/plumed.dat"
+                destColvar = path + "/plumed.dat"
+                namd_path = path + '/sample.mdp'
+                original_path = self.parameter.inputPath + '/sample.mdp'
+
+        if not os.path.isfile(script_path) and not os.path.isfile(script_path + '_done') and script != False:
+            newScript = self.__prepare_script(a1, a2, snapshot, initial, initialNum, frame)
+        if not os.path.isfile(namd_path) or new_sampling is not None:
+            if self.parameter.software == 'namd':
+                self.__prepare_namd(a1, a2, snapshot, frame, initial, initialNum, new_sampling)
+            else:
+                copy(original_path, namd_path)
+        if not os.path.isfile(destColvar):
+            copy(origColvar, destColvar)
+            
+    def submit(self, newScript):
+        #job submission       
+        while True:
+            out = subprocess.check_output([self.parameter.jobcheck,'-u', self.parameter.username]).decode("utf-8").split('\n')
+            if len(out) -2 < self.parameter.max_jobs:  # allowed number of jobs
+                subprocess.run([self.parameter.jobsubmit,newScript])
+                break
+            else:
+                time.sleep(60)
+                
+    def check(self, a1=None, a2=None, MSname=None, JobName=None, SampleName=None):
+        '''check queue to see if all jobs are finished'''
+        out = subprocess.check_output([self.parameter.jobcheck,'-u', self.parameter.username]).decode("utf-8").split('\n')
+        if a1 is not None and a2 is not None:
+            name = 'MS' + '_' + str(a1) + '_' + str(a2)
+        if SampleName is not None:
+            name = SampleName
+        if MSname is not None:
+            name = MSname
+        if JobName is not None:
+            name = JobName
+        job = []
+        if self.parameter.jobcheck == 'squeue' and len(out) > 2:
+            job.append(list(filter(None, out[1].split(' '))))
+        for i in range(2, len(out)-1):
+            job.append(list(filter(None, out[i].split(' '))))
+            
+        for i in range(len(job)):
+            if SampleName is not None and job[i][2].split('_')[0] == 'MS':
+                return False
+            if MSname is not None and job[i][2].split('_')[0] == name:
+                return False  # not finished
+            if JobName is not None and job[i][2].split('_')[0] == name:
+                return False
+        return True # finished
+    
+    def __prepare_script(self, a1, a2, snapshot=None, initial=None, initialNum=None, script=None, frame=None):
+        '''modify job submission file'''
+
+        if initial:
+            start_script = initialNum
+            end_script = self.parameter.traj_per_script[0] + initialNum - 1
+        elif snapshot:
+            start_script = snapshot
+            end_script = self.parameter.traj_per_script[2] + snapshot - 1
+
+        if not snapshot and not initial:
+            start_script=None
+            end_script=None
+        elif (initial and self.parameter.traj_per_script[0] == 1) or \
+            (snapshot and self.parameter.traj_per_script[2] == 1):
+            script_number = str(start_script)
+        elif end_script > 1:
+            script_number = str(start_script) + '_' + str(end_script)
+        else:
+            script_number = str(start_script)
+            
+        lst = sorted([a1, a2])
+        name = str(lst[0]) + '_' + str(lst[1])
+        MSpath = self.parameter.crdPath + '/' + name
+    
+        if snapshot:
+            newScriptPath = MSpath + '/' + str(self.parameter.iteration) + "/" + str(snapshot)
+            #newScript = newScriptPath + "/submit"
+            path = MSpath + '/' + str(self.parameter.iteration) + '/' + str(snapshot)
+            name = 'MILES' + '_' + str(a1) + '_' + str(a2) + '_' + script_number
+            namd_file = 'free'
+        elif initial:
+            newScriptPath = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum)
+            #newScript = newScriptPath + '/submit'
+            path = self.parameter.seekPath + '/structure' + str(a1) + "/" + str(initialNum)
+            name = 'a' + str(a1) + '_' + script_number
+            namd_file = 'free'
+        else:
+            newScriptPath = MSpath
+            #newScript = newScriptPath + "/MS" + name
+            path = MSpath
+            name = 'MS' + '_' + str(a1) + '_' + str(a2)
+            namd_file = 'sample'
+        if self.parameter.software == 'namd':
+            namd_file = './' + namd_file + '.namd'
+        else:
+            namd_file += '.mdp'
+            #also need our path for the script. For namd this is found in the actual namd part
+            if not initial and not snapshot:
+                plumed_file = 'plumed.dat'
+            else:
+                plumed_file = 'plumed_free.dat'
+            
+            
+        newScript = newScriptPath +'/submit'
+        create_folder(newScriptPath)
+        copyfile(self.parameter.inputPath + '/submit', newScript)
+        if self.parameter.software == 'namd':
+            self.__script_namd(newScript, namd_file, name, script, path, initial, start_script, end_script)
+        else:
+            self.__script_gromacs(newScriptPath, namd_file, name, plumed_file, script, a1, snapshot, frame, initial, start_script, end_script)
+
+        
+    def __script_gromacs(self, newScriptPath, filename, name, plumed_file, script, a1, snapshot, frame, initial, start_script, end_script):
+        count = 0
+        gromacs_lines = []
+        if initial == 'yes':
+            frame_value = 0
+            relative_input = '../../../../my_project_input'
+            gro_option = ' -c '
+            config = ''
+        elif snapshot:
+            #frame_value = 0.1 * frame
+            frame_value = 0.1 * (snapshot + self.parameter.startTraj - 1)
+            relative_input = '../../../../my_project_input'
+            gro_option = ' -t'
+            config = '-time frameval -c ' + relative_input + '/conf.gro'             
+        else:
+            relative_input = '../../my_project_input'
+            #if os.path.exists(newScriptPath + '/statefromseek.cpt'):
+            gro_option = ' -t'
+            #else:
+            #    gro_option = ' -c'
+            config = ' -c ' + relative_input + '/conf.gro'
+        with FileInput(files=newScriptPath + '/submit', inplace=True) as f:
+            for line in f:
+                line = line.strip()
+                info = line.split()
+                if not info:
+                    continue
+                if 'name' in line:
+                    line = line.replace('name',name)
+                if 'path' in line:
+                    line = line.replace('path', newScriptPath)
+                if '/bin/gmx' in line:
+                    count += 1
+                    if count == 1:    
+                        line += ' grompp -f ' + filename + gro_option + ' replace_path ' + config + ' -p ' + relative_input + '/topol.top -o topol.tpr'
+                        gromacs_lines.append(line)
+                        continue
+                    else:
+                        line += ' mdrun -s topol.tpr -plumed ' + plumed_file + ' '
+                        gromacs_lines.append(line)
+                        continue
+                print(line)
+        if not snapshot:
+            if (self.parameter.milestone_search == 1 or self.parameter.milestone_search == 3) and not initial:
+                new_path = 'statefromseek.cpt'
+            else:
+                new_path = relative_input + '/pdb/' + str(a1) + '.pdb'
+        else:
+            if self.parameter.iteration == 1:
+                new_path = '../../traj.trr'
+            else:
+                new_path = self.parameter.outputname + '.cpt'
+        newScript = newScriptPath + '/submit'
+        fconf = open(newScript, 'a')
+        if not snapshot and not initial:
+            for i in script:
+                print('cd ../' + str(i), file=fconf)
+                for j in gromacs_lines:  
+                    if 'replace_path' in j:
+                        j = j.replace('replace_path', new_path)
+                    fconf.write(j + '\n')            
+            fconf.close()
+        else:
+            counter = 0
+            for i in range(start_script, end_script + 1):
+                print('cd ../' + str(i), file=fconf)
+                for j in gromacs_lines:  
+                    if 'replace_path' in j:
+                        j = j.replace('replace_path', new_path)
+                    j = j.replace('frameval', str(frame_value + counter))
+                    fconf.write(j + '\n')
+                counter += 0.1
+            fconf.close()
+        
+    def __script_namd(self, newScript, namd_file, name, script, path, initial, start_script, end_script):
+        with FileInput(files=newScript, inplace=True) as f:
+            for line in f:
+                line = line.strip()
+                info = line.split()
+                if not info:
+                    continue
+                keyword = None
+                for item in ['source', 'name', 'path', 'namd']:
+                    if item in line:
+                        keyword = item
+                        place = info.index(item)
+                        break
+                if keyword == None:
+                    print(" ".join(str(x) for x in info))
+                    continue
+                if keyword == 'source':
+                    if self.parameter.nodes:
+                        import numpy as np
+                        rand = np.random.uniform(0,len(self.parameter.nodes),1)
+                        info[2] = 'hostname="' + self.parameter.nodes[int(rand)] + '"'
+                    else:
+                        info.insert(0, '#')  
+                elif keyword == 'name':
+                    info[place] = name
+                elif keyword == 'path':
+                    info[place] = path
+                elif keyword == 'namd':
+                    info[place] = namd_file
+                    #if (initial and self.parameter.traj_per_script[0] != 1) or (snapshot and self.parameter.traj_per_script[2] != 1) or(not snapshot and not initial and self.parameter.traj_per_script[1] != 1):
+                    namd_line = (" ".join(str(x) for x in info))
+                    continue
+                line = (" ".join(str(x) for x in info))
+                print(line)
+        fconf = open(newScript, 'a')
+        if not initial and not snapshot:
+            for i in script:
+                print('cd ../' + str(i), file=fconf)
+                print(namd_line, file=fconf)
+        else:
+            for i in range(start_script, end_script + 1):
+                print('cd ../' + str(i), file=fconf)
+                print(namd_line, file=fconf)
+        fconf.close()
+        
+        return newScript    
+
+    def __prepare_namd(self, a1=None, a2=None, snapshot=None,frame=None, initial=None, initialNum=None, new_sampling=None):
+        '''modify namd configuration file'''
+        from fileinput import FileInput
+        from random import randrange as rand 
+        import re
+        
+        enhanced = 0
+        lst = sorted([a1, a2])
+        name = str(lst[0]) + '_' + str(lst[1])
+        
+        if initial:
+            template = self.parameter.inputPath+ "/free.namd" 
+            MSpath = self.parameter.seekPath + '/structure' + str(a1)
+            filename = "/" + str(initialNum) + "/free.namd"
+        elif snapshot:
+            template = self.parameter.inputPath+ "/free.namd" 
+            MSpath = self.parameter.crdPath + '/' + name
+            filename = "/" + str(self.parameter.iteration) + "/" + str(snapshot) + "/free.namd"
+            if os.path.isfile(MSpath + "/" + str(self.parameter.iteration) + "/" + str(snapshot) + '/enhanced'):
+                enhanced = 1
+            else:
+                enhanced = 0
+        else:
+            template = self.parameter.inputPath + "/sample.namd"
+            MSpath = self.parameter.crdPath + '/' + name
+            filename = "/sample.namd"
+        
+        newNamd = MSpath + filename
+        copyfile(template, newNamd)
+            
+        tmp = []
+        colvar_commands = False
+        with open(newNamd, 'r') as f:
+            for line in f:
+#                line = line.lower()
+#                 info = line.split("#")[0].split()
+                info = line.split()
+                if info == []:
+                    continue                
+                if "colvars" in info and "on" in info:
+                    colvar_commands = True
+                if "colvarsConfig" in info and colvar_commands:
+                    if initial is not None or snapshot is not None:
+                        info[1] = 'colvar_free.conf'
+                    else:
+                        info[1] = 'colvar.conf'
+                    l = " ".join(str(x) for x in info)+"\n"
+                    tmp.append(l)
+                    continue
+                
+                if "run" in info or 'minimize' in info:
+#                    if info[0] == '#':
+#                        continue
+                    if not colvar_commands:
+                        tmp.append('colvars on\n')
+                        info[0] = 'colvarsConfig'
+                        if initial is not None or snapshot is not None:
+                            info[1] = 'colvar_free.conf\n\n'
+                        else:
+                            info[1] = 'colvar.conf\n\n'
+                        l = " ".join(str(x) for x in info)
+                        tmp.append(l)
+                        colvar_commands = True
+                    if initial is not None and self.parameter.milestone_search != 2:
+                        with open(file=self.parameter.ScMilesPath+'/tclScript_seek.txt') as f_tcl:
+                            for l in f_tcl:
+                                if "qsub" in l:
+                                    kill = l.strip()
+                                    killswitch = kill.split()
+                                    if self.parameter.jobsubmit == "qsub":
+                                        killswitch.pop(0)
+                                    else:
+                                        killswitch[0] = '#'
+                                    a = " ".join(str(x) for x in killswitch)
+                                    tmp.append(a +'\n')   
+                                elif "sbatch" in l:
+                                    kill = l.strip()
+                                    killswitch = kill.split()
+                                    if self.parameter.jobsubmit == "sbatch":
+                                        killswitch.pop(0)
+                                    else:
+                                        killswitch[0] = '#'
+                                    a = " ".join(str(x) for x in killswitch)
+                                    tmp.append(a +'\n')      
+                                else:
+                                    tmp.append(l)
+                        tmp.append('\n')
+                    if snapshot is None and initial is None:
+                        pass
+                    elif snapshot is not None or self.parameter.milestone_search == 2:
+                        if self.parameter.milestone_search == 2:
+                            filename = '/tclScript_grid.txt'
+                        else:
+                            filename = '/tclScript_step2.txt'
+                        with open(file=self.parameter.ScMilesPath+filename) as f_tcl:
+                            for l in f_tcl:
+                                if "qsub" in l:
+                                    kill = l.strip()
+                                    killswitch = kill.split()
+                                    if self.parameter.jobsubmit == "qsub":
+                                        killswitch.pop(0)
+                                    else:
+                                        killswitch[0] = '#'
+                                    a = " ".join(str(x) for x in killswitch)
+                                    tmp.append(a +'\n')   
+                                elif "sbatch" in l:
+                                    kill = l.strip()
+                                    killswitch = kill.split()
+                                    if self.parameter.jobsubmit == "sbatch":
+                                        killswitch.pop(0)
+                                    else:
+                                        killswitch[0] = '#'
+                                    a = " ".join(str(x) for x in killswitch)
+                                    tmp.append(a +'\n')      
+                                else:
+                                    tmp.append(l)
+                        tmp.append('\n')
+                tmp.append(line)     
+                
+        with open(newNamd, 'w') as f:
+            for i in range(len(tmp)):
+                f.write(tmp[i])
+                
+        if self.parameter.namd_conf == True:
+            if not snapshot and (initial or self.parameter.milestone_search == 0 or self.parameter.milestone_search == 2):
+                namd_conf_mod(self.parameter.inputPath, newNamd, a1)
+            
+        with FileInput(files=newNamd, inplace=True) as f:
+            for line in f:
+                line = line.strip()
+#                line = line.lower()
+                info = line.split()
+                
+                if "coordinates" in line and 'bincoordinates' not in line.lower():
+                    info[1] = self.parameter.inputPath + '/pdb/' + str(lst[0]) + ".pdb"
+                    if snapshot is None and initial is None and (os.path.exists(self.parameter.seekPath)):
+                        info[1] = "./seek.ms.pdb"
+                        
+                if "outputname" in line:
+                    info[1] = self.parameter.outputname
+                    
+                if "seed" in line:
+                    info[1] = rand(10000000, 99999999)
+                if 'restartfreq' in line:
+                    if initial:
+                        info[1] = 2
+                if "bincoordinates" in line or "binCoordinates" in line:
+                    if snapshot is not None:
+                        info[0] = 'bincoordinates'
+                        if self.parameter.iteration == 1:
+                            info[1] = '../../restarts/' + self.parameter.outputname + '.' + \
+                                      str(frame*self.parameter.sampling_interval) + '.coor'
+                        else:
+                            info[1] = self.parameter.outputname + '.coor'
+                    elif new_sampling is not None:
+                        info[0] = 'bincoordinates'
+                        info[1] = './restarts/' +str(self.parameter.outputname) + '.' + str(new_sampling) + '.coor'
+                
+                if "binvelocities" in line or "binVelocities" in line:
+                    if snapshot is not None:
+                        info[0] = 'binvelocities'
+                        if self.parameter.iteration == 1:
+                            info[0] = '#binvelocities'
+                            info[1] = '../../restarts/' + self.parameter.outputname + '.' + \
+                                      str(frame*self.parameter.sampling_interval) + '.vel'
+                        else:
+                            if not self.parameter.NVT:
+                                if enhanced == 0:
+                                    info[0] = 'binvelocities'
+                                else:
+                                    info[0] = '#binvelocities'
+                            if enhanced == 1:
+                                info[0] = '#binvelocities'
+                            info[1] = self.parameter.outputname + '.vel'
+                    elif new_sampling is not None:
+                        #info[0] = 'binvelocities'
+                        info[1] = './restarts/' + str(self.parameter.outputname) + '.' + str(new_sampling) + '.vel'
+            
+                if "extendedSystem" in line or "extendedsystem" in line:
+                    if snapshot is not None:
+                        info[0] = 'extendedSystem'
+                        if self.parameter.iteration == 1:
+                            info[1] = '../../restarts/' + self.parameter.outputname + '.' + \
+                                      str(frame * self.parameter.sampling_interval) + '.xsc'
+                        else:
+                            info[1] = self.parameter.outputname + '.xsc'
+                    elif new_sampling is not None:
+                        info[0] = 'extendedSystem'
+                        info[1] = './restarts/' + str(self.parameter.outputname) + '.' + str(new_sampling) + '.vel'
+                    elif self.parameter.namd_conf == True and not initial and os.path.exists(self.parameter.seekPath):
+                        info[0] = 'extendedSystem'
+                        info[1] = './sample.xsc'
+                        
+                                
+                if "restartsave" in line:
+                    if snapshot is not None or initial == 'yes':
+                        info[1] = "off"
+    
+                if "binaryrestart" in line:
+                    if initial == 'yes':
+                        info[1] = "no"    
+                if "set" in line and "valTotal" in line:
+                    info[2] = 2*(len(self.parameter.anchors[0]))-1                         
+                if "temperature" in line and "pressure" not in line:
+                    if self.parameter.iteration > 1:
+                        info[0] = '#temperature'
+                    else:
+                        info[0] = 'temperature'
+                    if initial:
+                        info[0] = 'temperature'
+                    if not self.parameter.NVT:
+                        if enhanced == 1:
+                            info[0] = 'temperature'
+                    if enhanced == 1:
+                        info[0] = 'temperature'
+
+                # if "langevin" in line and self.parameter.nve and snapshot is not None::
+                #     info[0] = '#'
+
+                if "lreplace" in line:
+#                    line = re.sub(r'[^\w]', ' ', line)
+                    if self.parameter.colvarsNum == 0:
+                        info[0] = '#set'
+                    else:
+                        if ']' in info[-1]:
+                            info[-1] = str(self.parameter.colvarsNum - 1) 
+                            info.append(']')
+                        else:
+                            info[-2] = str(self.parameter.colvarsNum - 1) 
+                            
+                if 'firsttimestep' in line and new_sampling is not None:
+                    info[0] = 'firsttimestep'
+                    info[1] = str(new_sampling)
+
+                if "a111" in line:
+                    if snapshot is None:
+                        info[2] = str(a1) 
+                    else:# snapshot != None:
+                        if self.parameter.iteration == 1:
+                            info[2] = str(a1) 
+                        else:
+                            path_start = MSpath + '/' + str(self.parameter.iteration) + '/' + str(snapshot)
+                            info[2] = str(get_initial_ms(path_start)[0]) 
+                        
+                if "a222" in line:
+                    if snapshot is None:
+                        info[2] = str(a2) 
+                    else: # snapshot != None:
+                        if self.parameter.iteration == 1:
+                            info[2] = str(a2) 
+                        else:
+                            path_start = MSpath + '/' + str(self.parameter.iteration) + '/' + str(snapshot)
+                            info[2] = str(get_initial_ms(path_start)[1]) 
+                
+                if initial is not None and "run" in info:
+                    info[1] = str(self.parameter.initialTime * 1000)
+
+                line = " ".join(str(x) for x in info)
+                print(line)
+        
+        
+#        print(filename, self.parameter.namd_conf)
+#        if filename == "/sample.namd" and self.parameter.namd_conf == True:
+#            namd_conf_mod(inputdir, newNamd, a1)
+            
+        
+def get_initial_ms(path):
+    '''get initial milestone for each free trajectory based on the folder name'''
+    import re
+    path_split = path.split("/")
+    initial_ms = list(map(int,(re.findall('\d+', path_split[-3]))))
+    with open(path + '/start.txt', 'w+') as f1:
+        print(initial_ms[0], initial_ms[1], file=f1)    
+    return initial_ms
+
+
+if __name__ == '__main__':
+    from parameters import *
+    from namd_conf_custom import *
+    from colvar import *
+    from plumed import *
+    
+    new = parameters()
+    new.initialize()
+    jobs = run(new)
+    new.iteration = 2
+    new.milestone_search = 1
+    new.traj_per_script = [2,2,2]
+    new.software = 'gromacs'
+    new.customColvars = False
+    new.initial_traj = 5
+    #colvar(new, free='yes', initial='yes').generate()
+    plumed(new, anchor1=1,free='yes',initial='yes').generate_plumed()
+    jobs.prepare_trajectory(a1=1, a2=3, initialNum=1, snapshot=1, script=True)
+
+
+    

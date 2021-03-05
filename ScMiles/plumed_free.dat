@@ -1,0 +1,300 @@
+CV1: TORSION ATOMS=5,7,9,15
+CV2: TORSION ATOMS=7,9,15,17
+
+
+CUSTOM ...
+        LABEL=cosphi
+        ARG=CV1
+        VAR=x1
+        FUNC=cos(x1)
+        PERIODIC=-pi,pi
+... CUSTOM
+
+CUSTOM ...
+        LABEL=cospsi
+        ARG=CV2
+        VAR=x1
+        FUNC=cos(x1)
+        PERIODIC=-pi,pi
+... CUSTOM
+
+LOWER_WALLS ARG=cosphi AT=-0.88 KAPPA=80000.0
+LOWER_WALLS ARG=cospsi AT=-0.88 KAPPA=80000.0
+
+CUSTOM ...
+LABEL=rmsd1
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-1.5708)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd2
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-1.0472)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd3
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-0.5236)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd4
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd5
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2+0.5236)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd6
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+1.22173)^2+(x2+1.22173)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd7
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1+0.5236)^2+(x2+1.22173)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd8
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-0.0)^2+(x2-0.0)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd9
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-0.0)^2+(x2+1.22173)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd10
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-0.5236)^2+(x2+1.22173)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd11
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-1.0472)^2+(x2+1.22173)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=rmsd12
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=sqrt((x1-1.5708)^2+(x2+1.22173)^2)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepvalue1
+VAR=a,b,c
+ARG=rmsd4,rmsd8,rmsd1
+FUNC=step(a-c)+step(b-c)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepvalue2
+VAR=a,b,c
+ARG=rmsd4,rmsd8,rmsd2
+FUNC=step(a-c)+step(b-c)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepvalue3
+VAR=a,b,c
+ARG=rmsd4,rmsd8,rmsd3
+FUNC=step(a-c)+step(b-c)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepvalue5
+VAR=a,b,c
+ARG=rmsd4,rmsd8,rmsd5
+FUNC=step(a-c)+step(b-c)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepvalue6
+VAR=a,b,c
+ARG=rmsd4,rmsd8,rmsd6
+FUNC=step(a-c)+step(b-c)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepvalue7
+VAR=a,b,c
+ARG=rmsd4,rmsd8,rmsd7
+FUNC=step(a-c)+step(b-c)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepvalue9
+VAR=a,b,c
+ARG=rmsd4,rmsd8,rmsd9
+FUNC=step(a-c)+step(b-c)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepvalue10
+VAR=a,b,c
+ARG=rmsd4,rmsd8,rmsd10
+FUNC=step(a-c)+step(b-c)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepvalue11
+VAR=a,b,c
+ARG=rmsd4,rmsd8,rmsd11
+FUNC=step(a-c)+step(b-c)
+PERIODIC=NO
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepvalue12
+VAR=a,b,c
+ARG=rmsd4,rmsd8,rmsd12
+FUNC=step(a-c)+step(b-c)
+PERIODIC=NO
+... CUSTOM
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepvalue1
+BASIN_LL1=1.9
+BASIN_UL1=2.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor1.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepvalue2
+BASIN_LL1=1.9
+BASIN_UL1=2.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor2.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepvalue3
+BASIN_LL1=1.9
+BASIN_UL1=2.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor3.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepvalue5
+BASIN_LL1=1.9
+BASIN_UL1=2.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor5.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepvalue6
+BASIN_LL1=1.9
+BASIN_UL1=2.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor6.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepvalue7
+BASIN_LL1=1.9
+BASIN_UL1=2.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor7.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepvalue9
+BASIN_LL1=1.9
+BASIN_UL1=2.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor9.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepvalue10
+BASIN_LL1=1.9
+BASIN_UL1=2.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor10.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepvalue11
+BASIN_LL1=1.9
+BASIN_UL1=2.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor11.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepvalue12
+BASIN_LL1=1.9
+BASIN_UL1=2.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor12.dat
+... COMMITTOR
+
+PRINT STRIDE=1 ARG=rmsd1,rmsd2,rmsd3,rmsd4,rmsd5,rmsd6,rmsd7,rmsd8,rmsd9,rmsd10,rmsd11,rmsd12,CV1,CV2 FILE=Aladipep.colvars.traj

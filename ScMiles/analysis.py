@@ -13,11 +13,11 @@ from parameters import *
 from milestoning_mp import *
 
 
-def analysis_kernel(parameter, skip_compute):
+def analysis_kernel(parameter):
     log("Computing...")    
     parameter.network = {}
-    info, new, known = milestoning(parameter, skip_compute)
-    print(info)
+    info, new, known = milestoning(parameter, parameter.skip_compute)
+    #print(info)
     if len(new) != 0:
         parameter.MS_new = (parameter.MS_new | new) - known
     if parameter.sing:
