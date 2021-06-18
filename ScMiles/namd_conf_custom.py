@@ -13,8 +13,8 @@ __all__ = ['namd_conf_mod']
 
 from fileinput import FileInput
 
-def namd_conf_mod(inputdir, newNamd, anchor):
-    vector, origin = namd_conf_read(inputdir, anchor)
+def namd_conf_mod(inputdir, newNamd, anchor, parameter):
+    vector, origin = namd_conf_read(inputdir, anchor,parameter)
     with FileInput(files=newNamd, inplace=True) as f:
         for line in f:
             line = line.strip()
@@ -34,7 +34,7 @@ def namd_conf_mod(inputdir, newNamd, anchor):
             print(line)
                 
                 
-def namd_conf_read(inputdir,anchor):
+def namd_conf_read(inputdir,anchor,parameter):
     vector = None
     origin = None
     pdb = inputdir + '/pdb/' + str(anchor) + '.pdb'
@@ -46,7 +46,10 @@ def namd_conf_read(inputdir,anchor):
 #                print(info)
                 vector = [float(info[1]), float(info[2]), float(info[3])]
 #                print(vector)
-                origin = [x / 2.0 for x in vector]
+                if parameter.origin == 1:
+                    origin = [x / 2.0 for x in vector]
+                else:
+                    origin = [0.0 for x in vector]
 #                print(origin)
                 break
 #    print(vector, origin, anchor)

@@ -1,0 +1,106 @@
+CV1: TORSION ATOMS=5,7,9,15
+CV2: TORSION ATOMS=7,9,15,17
+
+CUSTOM ...
+        LABEL=cosphi
+        ARG=CV1
+        VAR=x1
+        FUNC=cos(x1)
+        PERIODIC=-pi,pi
+... CUSTOM
+
+CUSTOM ...
+        LABEL=cospsi
+        ARG=CV2
+        VAR=x1
+        FUNC=cos(x1)
+        PERIODIC=-pi,pi
+... CUSTOM
+
+LOWER_WALLS ARG=cosphi AT=-0.97 KAPPA=80000.0
+LOWER_WALLS ARG=cospsi AT=-0.50 KAPPA=80000.0
+
+CUSTOM ...
+        LABEL=d
+        ARG=cosphi,CV2
+        VAR=x1,x2
+        FUNC=cos(15.0*pi/180.0)*step(-1.0*x2)+x1*step(x2)
+        PERIODIC=NO
+... CUSTOM
+
+UPPER_WALLS ARG=d AT=cos(15.0*pi/180.0) KAPPA=80000.0
+CUSTOM ...
+LABEL=stepfunction32_15
+PERIODIC=NO
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=step(x1+0.78538)+step(-0.26178000000000007-x1)+step(x2+1.30896)*2
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepfunction32_31
+PERIODIC=NO
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=step(-0.7853749999999999-x1)*2+step(x2+1.8325500000000001)+step(-1.30895-x2)
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepfunction32_CV2-low
+PERIODIC=NO
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=step(-1.8326-x2)*2+step(x1+0.78538)+step(-0.26178000000000007-x1)
+... CUSTOM
+
+CUSTOM ...
+LABEL=stepfunction32_20
+PERIODIC=NO
+ARG=CV1,CV2
+VAR=x1,x2
+FUNC=step(x1+0.26179)*2+step(x2+1.8325500000000001)+step(-1.30895-x2)
+... CUSTOM
+
+
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepfunction32_15
+BASIN_LL1=3.9
+BASIN_UL1=4.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor1.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepfunction32_31
+BASIN_LL1=3.9
+BASIN_UL1=4.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor2.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepfunction32_CV2-low
+BASIN_LL1=3.9
+BASIN_UL1=4.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor3.dat
+... COMMITTOR
+
+COMMITTOR ...
+STRIDE=1
+ARG=stepfunction32_20
+BASIN_LL1=3.9
+BASIN_UL1=4.1
+BASIN_LL2=-10
+BASIN_UL2=-9
+FILE=committor4.dat
+... COMMITTOR
+
+PRINT STRIDE=1 ARG=stepfunction32_15,stepfunction32_31,stepfunction32_CV2-low,stepfunction32_20,CV1,CV2 FILE=Aladipep.colvars.traj

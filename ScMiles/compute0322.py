@@ -16,7 +16,6 @@ import numpy as np
 from network_check import pathway
 #from voronoi_plot import voronoi_plot
 from additional_functions import *
-from log import *
 
 __all__ = ['k_average','compute']
 
@@ -93,7 +92,7 @@ def flux(k):
     idx = np.abs(e_v - 1).argmin()  
     q = [i.real for i in e_f[:, idx]]
     q = np.array(q, dtype='float64')
-    if np.all(q < 0): #may need to be <=
+    if np.all(q < 0):
         q = -1 * q
     return q
 
@@ -101,7 +100,7 @@ def flux(k):
 def prob(q, t):
     '''probability calculation'''
     p = np.transpose(q) * np.squeeze(t)
-    p_norm = np.float64(p / np.sum(p))
+    p_norm = p / np.sum(p)
     return p_norm
 
 
@@ -145,7 +144,7 @@ def get_boundary(parameter, ms_index):
                 parameter.product_milestone.append(int(list(ms_index.keys())[list(ms_index.values()).index(item)]))            
 
 
-def MFPT(parameter, kk, t, print_var=None):
+def MFPT(parameter, kk, t):
     '''MFPT based on flux'''
     k = kk.copy()
     for i in parameter.product_milestone:
@@ -160,7 +159,7 @@ def MFPT(parameter, kk, t, print_var=None):
     return float(tau)
     
 
-def MFPT2(parameter, k, t, print_var=None):
+def MFPT2(parameter, k, t):
     '''MFPT based on inverse of K'''
     dim = len(k)
     I = np.identity(dim)
@@ -169,6 +168,7 @@ def MFPT2(parameter, k, t, print_var=None):
         if i == -1:
             return -1
         k2[i] = [0 for i in k2[i]]
+    
     p0 = np.zeros(dim)
     for i in parameter.reactant_milestone:
         if i == -1:
@@ -254,8 +254,11 @@ def compute(parameter, partial_compute=False):
             for i in range(len(info)):
                 info[i] = float(info[i])
             t_matrix.append(info)
+    #print(t_matrix)
     t_matrix = np.array(t_matrix, dtype='float64')
+    #print(t_matrix)
     ms_list = np.load(path + '/ms_index.npy', allow_pickle=True).item()
+    print(t)
     kk = k.copy()
     tt = t.copy()
     parameter.reactant_milestone = []
@@ -264,6 +267,7 @@ def compute(parameter, partial_compute=False):
     
     kk = k_average(np.array(kk, dtype='float64'))
     
+
     kk_cyc = k.copy()
     for i in parameter.product_milestone:
         kk_cyc[i] = [0 for j in k[i]]
@@ -271,7 +275,7 @@ def compute(parameter, partial_compute=False):
             kk_cyc[i][j] = 1.0 / len(parameter.reactant_milestone)   
     q_cyc = flux(kk_cyc)
     
-    q = flux(kk)
+    q = flux(kk)  
 
 
     #print("COMPUTE", partial_compute)
@@ -283,32 +287,29 @@ def compute(parameter, partial_compute=False):
   
     p = prob(q,tt)
     energy = free_energy(p)
-    tau1 = MFPT(parameter, kk, tt, True)
-    tau2 = MFPT2(parameter, kk, tt, True)
-
+    tau1 = MFPT(parameter, kk, tt)
+    tau2 = MFPT2(parameter, kk, tt)
+    #print("exit time is")
+    #print(exit_t)
+    
     energy_samples = []
     MFPT_samples = []
     MFPT2_samples = []
     energy_err = []
     MFPT_err = []
     MFPT_err2 = []    
-    committor_samples = []
-    committor_err = []
     
-  #  for i in range(len(t_std)):     #need to change this part to work with classic milestoning as well
-   #     t_std[i] = t_std[i]/sqrt(parameter.trajPerLaunch)
+    for i in range(len(t_std)):
+        t_std[i] = t_std[i]/sqrt(parameter.trajPerLaunch)
     
     for i in range(parameter.err_sampling):
         k_err = k_error(np.mat(kc))
-        if not isinstance(t_std,float):
-            t_std = tt
+        #if not isinstance(t_std,float):
+            #t_std = tt
+        t_err = t_error(tt, t_std)
         q_temp = flux(k_err)
         p_temp = prob(q_temp,tt)
-        #committor_samples.append(committor(parameter, k_err))
         energy_samples.append(free_energy(p_temp))
-        if 0 in t_std:
-            continue
-        t_err = t_error(tt, t_std)
         MFPT_er = MFPT(parameter, k_err, t_err)
         MFPT_samples.append(MFPT_er)
         MFPT_er2 = MFPT2(parameter, k_err, t_err)
@@ -324,22 +325,15 @@ def compute(parameter, partial_compute=False):
     
     for i in range(dimension):        
         energy_err.append(np.std(np.array(energy_samples)[:,i], ddof=1))
-        #committor_err.append(np.std(np.array(energy_samples)[:,i], ddof=1))
-    if MFPT_samples != []:
-        MFPT_err = float(np.std(MFPT_samples, ddof=1))
-        MFPT_err2 = float(np.std(MFPT2_samples, ddof=1))
-    else:
-        MFPT_err = -1
-        MFPT_err2 = -1
+    MFPT_err = float(np.std(MFPT_samples, ddof=1))
+    MFPT_err2 = float(np.std(MFPT2_samples, ddof=1))
+    print(q)
+    print(p)
     if parameter.software == 'namd':
         time_unit = 'fs'
     else:
         time_unit = 'fs'
         #time_unit = 'ps'    
-
-    if np.isinf(tau1) or np.isinf(tau2):
-        log("WARNING: MFPT is inf, it is possible that the K matrix is not connected")
-
     with open(path + '/results.txt', 'w+') as f1:
         print('{:>4} {:>4} {:>10} {:>10} {:>13} {:>10}'.format('a1', 'a2', 'q', 'p', 'freeE(kT)', 'freeE_err'),file=f1)
         keyIndex = 0
@@ -349,7 +343,7 @@ def compute(parameter, partial_compute=False):
                     keyIndex += 1
                 else:
                     break
-            print('{:4d} {:4d} {:10.5e} {:10.7e} {:13.5f} {:10.5f}'.format(ms_list[keyIndex][0], ms_list[keyIndex][1], 
+            print('{:4d} {:4d} {:10.5f} {:10.7f} {:13.5f} {:10.5f}'.format(ms_list[keyIndex][0], ms_list[keyIndex][1], 
                   q[i], p[i], energy[i], energy_err[i]), file=f1)
             keyIndex += 1  
         print('\n\n',file=f1)
@@ -358,10 +352,10 @@ def compute(parameter, partial_compute=False):
         
     c = committor(parameter, kk)
     exit_t, directional_exit_t = exit_time(parameter, kk, tt, c)
+
     m = []
     for ms in ms_list.values():
         m.append(ms)
-    print(m)
     with open(path + '/committor.txt', 'w+') as f1:
         print('\n'.join([''.join(['{:>15}'.format(str(item)) for item in m])]),file=f1)
         print('\n'.join([''.join(['{:15.8f}'.format(item) for item in np.squeeze(c)])]),file=f1)
@@ -464,6 +458,7 @@ def plots(parameter):
         reactant.append(results_df.loc[(str(parameter.reactant[0]) + '_' + str(parameter.reactant[1]))]['CV' + str(i+1) + '_avg'])
         product.append(results_df.loc[(str(parameter.product[0]) + '_' + str(parameter.product[1]))]['CV' + str(i+1) + '_avg'])
 
+    print(results_df)
     for i in range(len(parameter.anchors[0])):
         results_df.sort_values(['CV' + str(i+1) + '_avg'], inplace=True)
         create_plot(parameter, results_df['CV' + str(i+1) + '_avg'], results_df['freeE(kT)'], 'FreeEnergyOfCV' + str(i+1),
@@ -474,7 +469,57 @@ def plots(parameter):
                     'CV' + str(i+1), 'Flux', reactant[i], product[i])
     
 
-
+def get_start_end_lifetime(parameter):
+    import pandas as pd
+    import os
+    import re
+    data = []
+    for ms in parameter.MS_list:    
+        lst = re.findall('\d+',ms)
+        name = lst[0] + '_' + lst[1]
+        ms_path = parameter.crdPath + '/' + name + '/' + str(parameter.iteration)
+        next_frame = get_next_frame_num(ms_path)
+        for traj in range(1, next_frame):
+            tmp = []
+            traj_path = ms_path + '/' + str(traj) 
+            if os.path.isfile(traj_path + '/start.txt'):
+                start = pd.read_csv(traj_path + '/start.txt', header=None, delimiter=r'\s+').values.tolist()[0]
+            else:
+                start = ['N','N']
+            if os.path.isfile(traj_path + '/end.txt'):
+                end = pd.read_csv(traj_path + '/end.txt', header=None, delimiter=r'\s+').values.tolist()[0]
+            else:
+                end = ['N','N']
+            if os.path.isfile(traj_path + '/lifetime.txt'):
+                lifetime = pd.read_csv(traj_path + '/lifetime.txt', header=None, delimiter=r'\s+').values.tolist()[0]
+            else:
+                lifetime = 'N'
+            if os.path.isfile(traj_path + '/enhanced'):
+                enhanced = 'Enhanced'
+            else:
+                enhanced = 'NotEnhanced'
+            tmp = [parameter.iteration, start[0], start[1], end[0], end[1], lifetime[0], enhanced, traj_path]
+            '''            
+            tmp.append(str(start[0]))
+            tmp.append(str(start[1]))
+            tmp.append(str(end[0]))
+            tmp.append(str(end[1]))
+            tmp.append(str(lifetime))
+            '''
+            data.append(tmp)
+            #print(data)
+    with open(parameter.currentPath + '/iteration_data.txt', 'w') as f1:
+    	for item in data:
+            f1.write(" ".join(map(str,item)) + '\n')
+    if parameter.iteration == 1:
+        with open(parameter.currentPath + '/all_data.txt', 'w') as f1:
+            f1.write('Iteration start[0] start[1] end[0] end[1] Lifetime Enhancement Path')
+            for item in data:
+                f1.write(" ".join(map(str,item)) + '\n')
+    else:
+        with open(parameter.currentPath + '/all_data.txt', 'a') as f1:
+            for item in data:
+                f1.write(" ".join(map(str,item)) + '\n')
 
 if __name__ == '__main__':
     from parameters import *

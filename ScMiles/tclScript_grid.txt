@@ -8,7 +8,7 @@ set list [cv list]
 set list [lreplace $list 0 1]
 #print $list
 
-set valTotal 5
+set valTotal 3
 set valA 0
 set valB 0
 
@@ -17,31 +17,21 @@ set col [expr abs([cv colvar $colv value])]
 if {($col == 0)} {
   set valA 0
   set valB 0
-} elseif {($col == 1)} {
-  set valA 1
-  set valB 0
-} elseif {($col == 2) && ($valA == 1)} {
-set valB [expr {$valB + 2}]
-} else {
-set valA 0
-set valB 0
-}
-set total [ expr {$valA + $valB}]
-if {$total == $valTotal} {
-break
+} elseif {($col == $valTotal)} {
+  set valA $valTotal
+  break
 }
 }
-
-if {$total == $valTotal} {
+if {$valA == $valTotal} {
 print $ts $valA $valB
 cv printframe
 cv save stop
 print "hit new milestone"
 #### pick exit command depands on the cluster ###
-exit
+qsub exit
 #################################################
-#set process [pid]
-#exec kill -9 $process
+sbatch set process [pid]
+sbatch exec kill -9 $process
 #################################################
 }
 }

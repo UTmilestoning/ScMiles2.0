@@ -9,6 +9,7 @@ Running free trajectories.
 
 """
 
+from math import isnan
 import os, time, re, sys
 from run import *
 from parameters import *
@@ -118,6 +119,7 @@ class trajPool:
         if sum(distribution.values()) == 0:
             print("Wrong distribution on {}.".format(self.__dest__))
             # print("Exiting...")
+            #self.parameter.MS_list.remove(self.__dest__)
             log("Wrong distribution on {}. Maybe due to no trajectory reached or wrong flux on the adjacent milestone"
                 .format(self.__dest__))
         for orig_ms in orig_list:   
@@ -126,9 +128,9 @@ class trajPool:
         
 
 class traj:
-    def __init__(self, parameter, jobs):
+    def __init__(self, parameter):
         self.parameter = parameter
-        self.jobs = jobs
+        #self.jobs = jobs
         self.pool = {}
 
     def __enter__(self):
@@ -140,7 +142,7 @@ class traj:
     def __repr__(self) -> str:
         return ('Free trajectories.')    
 
-    def __snapshots(self, MSname):
+    def __snapshots(self, MSname, ignore_method=False):
         '''
         param MSname:
             milestone name
@@ -150,7 +152,7 @@ class traj:
             250 free traj simulations for milestone MSname, return 251 as the next traj number for folder name
         '''
         next_frame = 1
-        if self.parameter.method == 1 and self.parameter.restart == False:
+        if self.parameter.method == 1 and self.parameter.restart == False and ignore_method == False:
             return next_frame
         lst = re.findall('\d+',MSname)
         name = lst[0] + '_' + lst[1]
@@ -161,44 +163,58 @@ class traj:
             else:
                 return next_frame
     
-    def check(self):
-        '''check running jobs on cluster'''
-        while True:
-            name = 'MILES'
-            if self.jobs.check(JobName=name) == False:
-                pass
-            else:
-                return True
-            print("Free trajectories are running... Next check in 200 seconds. {}".format(str(datetime.now())))
-            time.sleep(200)  
-
     def __copy(self, orig, new, restart=1, enhanced=False):
         '''copy restart files for next iteration'''
-        lst = ['.coor', '.vel', '.xsc']
-        if not os.path.exists(new):
-            os.makedirs(new)
-        for ext in lst:
-            newName = new + '/' + self.parameter.outputname + ext
-            if restart == 1:
-                oldName = orig + '/' + self.parameter.outputname + '.restart' + ext 
-            else:
-                oldName = orig + '/' + self.parameter.outputname + ext
+        create_folder(new)
+        if self.parameter.software == 'namd': #different since namd has 3 files
+            lst = ['.coor', '.vel', '.xsc']
+            for ext in lst:
+                newName = new + '/' + self.parameter.outputname + ext
+                if restart == 1:
+                    oldName = orig + '/' + self.parameter.outputname + '.restart' + ext 
+                else:
+                    oldName = orig + '/' + self.parameter.outputname + ext
+                with open(new + '/original.txt', 'w+') as f:
+                    print('This trajectory is from', file=f)  
+                    print(orig, file=f) 
+                if enhanced:
+                    with open(new + '/enhanced', 'w+') as f:
+                        print('This trajectory is from enhancement', file=f)
+                try:  
+                    copyfile(oldName, newName)
+                except:
+                    pass
+        else:
+            if self.parameter.software == 'gromacs':
+                newName = new + '/' + self.parameter.outputname + '.cpt'
+                oldName = orig + '/' + 'state.cpt'
+            else: #lammps
+                newName = new + '/' + self.parameter.outputname + '.restart'
+                oldName = orig + '/' + self.parameter.outputname + '.restart'
             with open(new + '/original.txt', 'w+') as f:
-                print('This trajectory is from', file=f)  
-                print(orig, file=f) 
+                print('This trajectory is from',file=f)
+                print(orig, file=f)            
             if enhanced:
-                with open(new + '/enhanced', 'w+') as f:
-                    print('This trajectory is from enhancement', file=f)  
-            copyfile(oldName, newName)
+                with open(new + '/enhanced','w+') as f:
+                    print('This trajectory is from enhancement', file=f)
+            try:
+                copyfile(oldName, newName)
+            except:
+                pass 
+
 
     def __iteration_prepare(self, path, final_ms, orig):
         '''add each trajectory to trajPool based on the ending milestone'''
         if final_ms == [0,0]:
             return
-        if not os.path.isfile(path + '/' + self.parameter.outputname + '.restart.coor'):
+        if self.parameter.software == 'namd' and not os.path.isfile(path + '/' + self.parameter.outputname + '.restart.coor'):
+            return
+        if self.parameter.software in ('lammps','gromacs') and not os.path.isfile(path + '/' + self.parameter.outputname + '.colvars.traj'):
             return
         ms = str(final_ms[0]) + '_' + str(final_ms[1])
         MSname = 'MS' + ms
+        if MSname not in self.parameter.MS_list:
+            return
         MSorig = 'MS' + orig
 #        if self.parameter.ignorNewMS and MSname not in self.parameter.MS_list:
 #            return
@@ -234,11 +250,12 @@ class traj:
 #                print(final_ms)
                 self.__iteration_prepare(traj_path, final_ms, name)
 
-        kij, index, flux = compute(self.parameter)
+        kij, index, flux = compute(self.parameter, partial_compute = True)
         
 #        print(MS10_11)
 #        print(MS10_11.count_traj('MS11_12'))
-        for MSname in self.parameter.MS_list:
+        ms_list = self.parameter.MS_list.copy()
+        for MSname in ms_list:
             name = re.findall('\d+', MSname)[0] + '_' + re.findall('\d+', MSname)[1]
             path = self.parameter.crdPath + '/' + name + '/' + str(self.parameter.iteration) + '/'
             if self.parameter.restart == True:
@@ -246,9 +263,9 @@ class traj:
                     continue
             distribution = globals()[MSname].get_distribution(kij, index, flux)
             if distribution == 0:
+                self.parameter.skip_MS.append(MSname)
                 continue
-            if not os.path.exists(path):
-                os.makedirs(path)
+            create_folder(path)
             path = path + 'distribution'
             with open(path, 'w+') as f:
                 print(distribution, file=f)  
@@ -257,14 +274,17 @@ class traj:
             total_orig, orig_list = globals()[MSname].count_ms() 
             if total_orig == 0:
                 print("No traj reached {}.".format(MSname))
-                # print("Exitting...")
+                # print("Exiting...")
                 log("No traj reached {}.".format(MSname))
                 log("Skip {} for next iteration.".format(MSname))
+                self.parameter.skip_MS.append(MSname)
                 continue
                 # sys.exit()
             total_traj = 0
 #            print(MSname, globals()[MSname].count_ms())
             for ms in distribution.keys():
+                if isnan(distribution[ms]):
+                    continue 
                 traj_num = int(distribution[ms] * self.parameter.trajPerLaunch)
                 if traj_num < 1:
                     traj_num = 1
@@ -288,17 +308,13 @@ class traj:
         '''copy restart files'''
         [anchor1, anchor2] = list(map(int,(re.findall('\d+', MSname))))
         name = str(anchor1) + '_' + str(anchor2)
-        filePath = os.path.dirname(os.path.abspath(__file__)) 
-        pardir = os.path.abspath(os.path.join(filePath, os.pardir))
-        path = pardir +  '/crd/' + name + '/' + str(self.parameter.iteration) + '/'  
-        if not os.path.exists(path):
-            os.makedirs(path)    
+        path = self.parameter.crdPath +'/' + name + '/' + str(self.parameter.iteration) + '/'  
+        create_folder(path)    
         continued = []
         for i, traj in enumerate(traj_lst):
             count = i + 1 + total_traj
             newPath = path + str(count)
-            if not os.path.exists(newPath):
-                os.makedirs(newPath)
+            create_folder(newPath)
             if traj not in continued:
                 self.__copy(traj, newPath, restart=1)
                 continued.append(traj)
@@ -309,59 +325,9 @@ class traj:
             ms = lst[-4] + '_' + lst[-3]
             print('Milestone {} has {} trajectories from enhancement.'\
                   .format(ms, len(traj_lst) - len(continued)), file=f)
+        if (len(traj_lst) - len(continued)) > 100:
+            log("Warning: for iteration {}, trajectories from {} have been enhanced more than 100 times for ms {}".format(self.parameter.iteration, name, ms))
     
-    def edit_submit_scripts(self, path, traj_frame):
-        #1 is done, 0 needs to restart
-        import os
-        from fileinput import FileInput
-        if traj_frame == 1:
-            beg_number = 1
-            end_number = self.parameter.trajPerLaunch + 1
-        else:
-            beg_number = traj_frame - self.parameter.trajPerLaunch
-            end_number = traj_frame
-        for i in range(beg_number, end_number):
-            next_line = False
-            run = False
-            current_path = path + '/' + str(i) + '/submit'
-            if os.path.isfile(current_path):
-                with FileInput(files=current_path, inplace=True) as f:
-                    for line in f:
-                        line = line.strip()
-                        if line.startswith('##'):
-                            print(line)
-                            continue
-                        if next_line == True:
-                            line = '##' + line
-                            next_line = False
-                        elif 'cd' in line and 'crd' not in line:
-                            info = line.split('/')
-                            traj_num = int(info[-1])
-                            if os.path.isfile(path + '/' + str(traj_num) + '/stop.colvars.state'):
-                                line = '##' + line
-                                next_line = True
-                            else:
-                                run = True
-                        print(line)
-                if run == False:
-                    if not os.path.exists(path + '/' + str(i) + '/submit_done'):
-                        os.rename(current_path, path + '/' + str(i) + '/submit_done')
-    
-    def check_finished(self, new_path):
-        if os.path.isfile(new_path + '/stop.colvars.state'):
-            return True
-        elif os.path.isfile(new_path + '/1.log'):
-            finished = False
-            with open(file=new_path + '/1.log')as f:
-                for line in f:
-                    if "End of program" in line:
-                        finished = True
-                        #print('end of program', new_path)
-            return finished
-        else:
-            #print('not found', new_path)
-            return False
-                    
     def launch(self, joblist=None, lastLog=None):
         '''launch free trajectories'''
         print("Iteration # {}".format(self.parameter.iteration))
@@ -371,162 +337,16 @@ class traj:
             if self.parameter.restart == False or (self.parameter.restart == True and "Iteration #" in lastLog):
                 self.iteration_initialize()
                 log('Iteration initialize complete')
+        elif self.parameter.method == 0 and self.parameter.skip_compute == True or self.parameter.restart == True:
+            launch(self.parameter, 'sample').launch_trajectories()
+
+        self.parameter.skip_compute = False
 
         for ms in self.pool:
             self.pool[ms] = 0
-        skip_submit = []
-
-        for name in self.parameter.MS_list:
-            [anchor1, anchor2] = list(map(int,(re.findall('\d+', name))))
-            MSname = str(anchor1) + '_' + str(anchor2)
-            next_frame = self.__snapshots(name)
-            frame = None
-            path_name = self.parameter.crdPath + '/' + MSname + '/' + str(self.parameter.iteration)
-            if lastLog == "Finished running trajectories":
-                skip = True
-            elif self.parameter.restart == True and (next_frame - 1) % self.parameter.trajPerLaunch == 0 and next_frame != 1:
-                skip = True
-            else:
-                #for i in range(next_frame):
-                create_folder(path_name)
-                for j in range(self.parameter.trajPerLaunch):
-                    if os.path.exists(path_name + '/' + str(j+next_frame) + '/colvar_free.conf'):
-                        continue
-                    folderPath = path_name + "/" + str(j+next_frame)
-                    submit = False
-                    frame = self.parameter.startTraj + next_frame // self.parameter.trajPerLaunch + j * self.parameter.interval
-                    if frame > self.parameter.nframe:
-                        break
-                    if (j+next_frame - 1) % self.parameter.traj_per_script[2] == 0:
-                        submit = True
-                    create_folder(folderPath)
-                    milestones(self.parameter).get_initial_ms(folderPath)
-                    colvar(self.parameter, free='yes', anchor1=anchor1, anchor2=anchor2).generate()
-                    self.jobs.prepare_trajectory(a1=anchor1, a2=anchor2, snapshot=j+next_frame, 
-                                                 frame=frame, script=submit)
-                #log('All files created for Iteration {}'.format(self.parameter.iteration))
-                skip = False
-                next_frame = self.__snapshots(name)
-      
-            if skip == True:
-                for i in range(next_frame - self.parameter.trajPerLaunch, next_frame):
-                    finished = self.check_finished(path_name + '/' + str(i))
-                    if finished == True:
-                        continue
-                    else:
-                        break
-                if finished == True:
-                    skip_submit.append(name)
-                else:
-                    self.edit_submit_scripts(path_name, next_frame)        
-        for name in self.parameter.MS_list:
-            if len(skip_submit) != 0:
-                if name in skip_submit:
-                    print('No new trajectories started from {} this iteration'.format(name))
-                    continue
-            launch = False
-            try:
-                first_frame = self.__snapshots(name) - self.parameter.trajPerLaunch
-            except:
-                first_frame = 1
-            if self.parameter.method == 0:
-                last_frame = self.__snapshots(name)
-            else:
-                last_frame = self.parameter.trajPerLaunch
-            for i in range(first_frame, last_frame):
-                [anchor1, anchor2] = list(map(int,(re.findall('\d+',name))))
-                MSname = str(anchor1) + '_' + str(anchor2)
-                traj_path = self.parameter.crdPath +'/' + MSname + '/' + str(self.parameter.iteration) + '/' + str(i)
-                if os.path.isfile(traj_path + '/submit'):
-                    self.jobs.submit(traj_path + '/submit')
-            print(str(datetime.now()))
-            print("Short trajectories started from milestone {}...".format(name))
-                     
-        log("{} short trajectories started from each milestone.".format(self.parameter.trajPerLaunch))
-        for name in self.parameter.MS_list:
-            if name in skip_submit:
-                continue
-            [anchor1, anchor2] = list(map(int,(re.findall('\d+',name))))
-            MSname = str(anchor1) + '_' + str(anchor2)
-            MSpath = self.parameter.crdPath + '/' + MSname
-            if self.parameter.restart == True:
-                if next_frame == 1:
-                    traj_frame = 1
-                else:
-                    traj_frame = self.__snapshots(MSname)
-                    traj_frame = traj_frame - self.parameter.trajPerLaunch
-                self.restore_scripts(MSpath + '/' + str(self.parameter.iteration), traj_frame)
-        self.check()
-        count = 0
-        new_milestones = []
-        log("Finished Running Trajectories")
-        if self.parameter.restart == True:
-            self.parameter.restart = False
-        for name in self.parameter.MS_list:
-            [anchor1, anchor2] = list(map(int,(re.findall('\d+', name))))
-            MSname = str(anchor1) + '_' + str(anchor2)
-            MSpath = self.parameter.crdPath +  '/' + MSname
-            last_frame = self.__snapshots(name)
-            for j in range(self.parameter.nframe):
-                path = MSpath + "/" + str(self.parameter.iteration) + "/" + str(j+1)
-                if not os.path.exists(path):
-                    continue
-                time, final_ms = milestones(self.parameter).get_final_ms(path)
-                count += 1
-            if self.parameter.ignorNewMS == False:
-                skip_compute, new_milestones = self.find_new_milestones(last_frame, MSpath + '/' + str(self.parameter.iteration), new_milestones)            
-            else:
-                skip_compute = False
-        if self.parameter.method == 1:
-            for item in new_milestones:
-                self.parameter.finished_constain.add(item[0])
-        return count / len(self.parameter.MS_list) + self.parameter.startTraj, skip_compute, new_milestones
-    
-    def restore_scripts(self, path, traj_frame):
-        import os
-        from fileinput import FileInput
-        for i in range(self.parameter.trajPerLaunch):
-            current_path = path + '/' + str(i + traj_frame)
-            #print(current_path)
-            if os.path.isfile(current_path + '/submit_done'):
-                os.rename(current_path + '/submit_done', current_path + '/submit')
-            if os.path.isfile(current_path + '/submit'):
-                with FileInput(files=current_path + '/submit', inplace=True) as r:
-                    for line in r:
-                        line = line.strip()
-                        if line.startswith('##') and 'source' not in line:
-                            line = line.replace('##', '')
-                        print(line)
         
-    def find_new_milestones(self, last_frame, MSpath, new_milestones):                
-        import pandas as pd
-        if self.parameter.new_ms_iterations > self.parameter.iteration:
-            self.parameter.ignorNewMS = True
-            return False, new_milestones
-        for i in range(1, last_frame):
-            end_info = MSpath + '/' + str(i) + '/end.txt'
-            end = pd.read_csv(end_info, header=None, delimiter=r'\s+').values.tolist()[0]
-            end_ms = 'MS' + str(end[0]) + '_' + str(end[1])
-            if end_ms not in self.parameter.MS_list:
-                new = True
-                for item in new_milestones:
-                    if end_ms in item[0]:
-                        new = False
-                        item[1] += 1
-                if new == True:
-                    new_milestones.append([end_ms, 1])
-            #checking against user input
-        print(new_milestones)
-        if self.parameter.new_ms_trajs != 0 and len(new_milestones) > 0:
-            for ms in new_milestones:
-                if ms[1] >= self.parameter.new_ms_trajs:
-                    skip_compute = True
-            if skip_compute == False:
-                self.parameter.ignorNewMS = True
-        else:
-            skip_compute = False
-        return skip_compute, new_milestones
-    
+        count = launch(self.parameter, 'free').launch_trajectories(lastLog = lastLog)
+        return count / len(self.parameter.MS_list) + self.parameter.startTraj
     
     def add_to_trajPool(self, dest, orig, path):
         '''add trajectory info to pool'''

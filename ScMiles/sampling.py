@@ -71,10 +71,18 @@ class sampling:
             restartsPath = self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2) + '/restarts'
             create_folder(self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2))
             if self.parameter.restart == True:
-                if os.path.isfile(self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2) + '/' + self.parameter.outputname + '.colvars.state'):
+                restart_path = self.parameter.crdPath + '/' + str(anchor1) + '_' + str(anchor2)
+                if self.parameter.software == 'namd' and os.path.exists(restart_path + '/' + self.parameter.outputname + '.colvars.state'): 
+                    continue
+                elif self.parameter.software == 'gromacs' and os.path.exists(restart_path + '/' + self.parameter.outputname + '.colvars.traj'):
+                    self.parameter.finished_constain.add(name)
+                    #move(restart_path + '/submit',restart_path + '/submit_finished')
                     continue
             if not os.path.exists(restartsPath) or self.parameter.additional_sampling == True:
-                colvar(self.parameter, anchor1, anchor2).generate()
+                if self.parameter.software == 'namd':
+                    colvar(self.parameter, anchor1, anchor2).generate()
+                else:
+                    plumed(self.parameter, anchor1, anchor2).generate_plumed()
                 if self.parameter.additional_sampling == True:
                     new_sampling = 0
                     for folder in glob.glob(restartsPath + '/*'):

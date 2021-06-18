@@ -1,0 +1,41 @@
+CV1: TORSION ATOMS=5,7,9,15
+CV2: TORSION ATOMS=7,9,15,17
+
+CUSTOM ...
+        LABEL=cosphi
+        ARG=CV1
+        VAR=x1
+        FUNC=cos(x1)
+        PERIODIC=-pi,pi
+... CUSTOM
+
+CUSTOM ...
+        LABEL=cospsi
+        ARG=CV2
+        VAR=x1
+        FUNC=cos(x1)
+        PERIODIC=-pi,pi
+... CUSTOM
+
+LOWER_WALLS ARG=cosphi AT=-0.97 KAPPA=80000.0
+LOWER_WALLS ARG=cospsi AT=-0.50 KAPPA=80000.0
+
+CUSTOM ...
+        LABEL=d
+        ARG=cosphi,CV2
+        VAR=x1,x2
+        FUNC=cos(15.0*pi/180.0)*step(-1.0*x2)+x1*step(x2)
+        PERIODIC=NO
+... CUSTOM
+
+UPPER_WALLS ARG=d AT=cos(15.0*pi/180.0) KAPPA=80000.0
+nei: RESTRAINT ...
+ARG=CV1
+AT=-1.30896
+KAPPA=10000.0
+... nei:
+uwall: UPPER_WALLS ARG=CV2 AT=0.2618 KAPPA=10000.0
+lwall: LOWER_WALLS ARG=CV2 AT=-0.2618 KAPPA=10000.0
+
+
+PRINT STRIDE=1 ARG=CV1,CV2 FILE=Aladipep.colvars.traj

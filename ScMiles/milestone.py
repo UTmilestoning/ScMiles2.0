@@ -33,6 +33,8 @@ class milestone:
         
         self.k_count = []   # np.array([[]]).astype(int)
         
+        self.t_count = []
+        
         self.t_hash = {}
 
     def __repr__(self) -> str:
@@ -94,10 +96,12 @@ class milestone:
         dim = len(self.k_count)
         if dim == 0:
             self.k_count = np.array([[0]], dtype=int)
+            self.t_count = np.array([[0]], dtype=int)
         else:
             self.k_count = np.append(self.k_count, np.zeros((dim,1), dtype=int), 1)
             self.k_count = np.append(self.k_count, np.zeros((1,dim+1), dtype=int), 0)
-    
+            self.t_count = np.append(self.t_count, np.zeros((dim,1), dtype=float), 1)
+            self.t_count = np.append(self.t_count, np.zeros((1,dim+1), dtype=float), 0)
         
 if __name__ == '__main__':
     ms = milestones()

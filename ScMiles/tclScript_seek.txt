@@ -27,10 +27,10 @@ cv printframe
 cv save stop
 print "hit new milestone"
 #### pick exit command depands on the cluster ###
-exit
+qsub exit
 #################################################
-#set process [pid]
-#exec kill -9 $process
+sbatch set process [pid]
+sbatch exec kill -9 $process
 #################################################
 }
 }

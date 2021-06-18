@@ -13,11 +13,11 @@ from parameters import *
 from milestoning_mp import *
 
 
-def analysis_kernel(parameter, skip_compute):
+def analysis_kernel(parameter):
     log("Computing...")    
     parameter.network = {}
-    info, new, known = milestoning(parameter, skip_compute)
-    print(info)
+    info, new, known = milestoning(parameter, parameter.skip_compute)
+    #print(info)
     if len(new) != 0:
         parameter.MS_new = (parameter.MS_new | new) - known
     if parameter.sing:
@@ -27,7 +27,9 @@ def analysis_kernel(parameter, skip_compute):
 if __name__ == '__main__':
     new = parameters()
     new.initialize()
-    new.iteration = 1
+    new.skip_compute = False
+#    new.iteration = 1
     from milestones import milestones
-    new.MS_list = milestones(new).initialize()
+    new.k_cutoff = 1
+    new.MS_list = milestones(new).read_milestone_folder()
     analysis_kernel(new)

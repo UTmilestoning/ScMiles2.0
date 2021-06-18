@@ -32,8 +32,6 @@ def create_seek_log(parameter, visited, key):
     seek_file = parameter.seekPath + '/seek_info.txt'
     if os.path.isfile(seek_file):
         os.remove(seek_file)
-    #if not os.path.isfile(seek_file):
-     #   os
     fconf = open(seek_file, 'a')
     if key == 'product':
         print('The product is not in MS_list', file=fconf)
