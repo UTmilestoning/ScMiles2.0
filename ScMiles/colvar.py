@@ -566,13 +566,16 @@ class colvar:
             count += 1
             walls = [anchor1_coor[i] + delta_value[i]/2, anchor1_coor[i] - delta_value[i]/2]
             walls.sort()
+            lower_wall = walls[0]
+            upper_wall = walls[1]
+            wall_epsilon = abs(upper_wall-lower_wall)*0.1
             for j in range(len(walls)):
                 if self.parameter.min_grid_value:
                     if walls[j] <= self.parameter.min_grid_value[i]:
-                        walls[j] = int(self.parameter.min_grid_value[i]/1.05)
+                        walls[j] = int(walls[j] + walls_epsilon
                 if self.parameter.max_grid_value:
                     if walls[j] >= self.parameter.max_grid_value[i]:
-                        walls[j] = int(self.aprameter.max_grid_value[i] / 1.05)
+                        walls[j] = int(walls[j] - walls_epsilon)
             print("\n", file=fconf)
             print("harmonicWalls {", file=fconf)
             print("  colvars length{}".format(count), file=fconf)
