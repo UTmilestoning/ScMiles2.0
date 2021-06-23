@@ -572,10 +572,10 @@ class colvar:
             for j in range(len(walls)):
                 if self.parameter.min_grid_value:
                     if walls[j] <= self.parameter.min_grid_value[i]:
-                        walls[j] = int(walls[j] + walls_epsilon)
+                        walls[j] = int(self.parameter.min_grid_value[i]) + walls_epsilon
                 if self.parameter.max_grid_value:
                     if walls[j] >= self.parameter.max_grid_value[i]:
-                        walls[j] = int(walls[j] - walls_epsilon)
+                        walls[j] = int(self.parameter.min_grid_value[i]) - walls_epsilon
             print("\n", file=fconf)
             print("harmonicWalls {", file=fconf)
             print("  colvars length{}".format(count), file=fconf)
