@@ -568,7 +568,7 @@ class colvar:
             walls.sort()
             lower_wall = walls[0]
             upper_wall = walls[1]
-            wall_epsilon = abs(upper_wall-lower_wall)*0.1
+            walls_epsilon = abs(upper_wall-lower_wall)*0.1
             for j in range(len(walls)):
                 if self.parameter.min_grid_value:
                     if walls[j] <= self.parameter.min_grid_value[i]:
